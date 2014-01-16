@@ -20,7 +20,7 @@ class Scanner:
 
     def warning(self, message, column=None):
 
-        if column == None:
+        if column is None:
             column = self.col_num
 
         print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (self.filename, self.line_num, column) + Color.YELLOW + "warning: " + Color.WHITE + message

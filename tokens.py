@@ -32,9 +32,6 @@ class Tokens:
         CONSTANT    = "CONSTANT"
         STRING      = "STRING"
         SYMBOL      = "SYMBOL"
-        OPERATOR    = "OPERATOR"
-        SPECIAL     = "SPECIAL"
-        UNKNOWN     = "UNKNOWN"
         COMMENT     = "COMMENT"
 
     class Token(object):

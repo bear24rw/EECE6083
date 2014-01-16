@@ -55,7 +55,7 @@ class Scanner:
             for char, next_char in col_iter:
 
                 # if we see a space just skip it and keep looking
-                if char in [' ', '\n']:
+                if char in [' ', '\n', '\t']:
                     continue
 
                 """

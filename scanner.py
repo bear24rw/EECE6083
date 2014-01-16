@@ -142,9 +142,18 @@ class Scanner:
                         self.warning("unexpected '\"' after constant", column=self.col_num+1)
                         break
 
+                    if token.value.endswith('.'):
+                        self.warning("number cannot end with decimal point")
+                        break
+
                     yield token
 
                     continue
+
+                # check for number starting with decimal
+                if char == '.':
+                    self.warning("unexpected decimal")
+                    break
 
                 """
                 String Literal

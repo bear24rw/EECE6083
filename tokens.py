@@ -9,10 +9,22 @@ class Tokens:
     symbols = arith_ops + comp_ops + logic_ops + brackets + special
 
     keywords = [
-            'if', 'endif',
-            'while', 'endwhile',
-            'int', 'double'
-            ]
+            'function',
+            'begin',
+            'end',
+            'global',
+            'integer',
+            'float',
+            'boolean',
+            'string',
+            'if',
+            'then',
+            'else',
+            'for',
+            'not',
+            'true',
+            'false',
+    ]
 
     class Type():
         KEYWORD     = "KEYWORD"

@@ -45,7 +45,7 @@ class Scanner:
 
         self.line_num = 0
 
-        for line in self.f.readlines():
+        for line in self.f:
 
             self.line = line
             self.line_num += 1

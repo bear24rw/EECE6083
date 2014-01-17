@@ -116,6 +116,10 @@ class Scanner:
                         token.value += next_char
                         char, next_char = next(col_iter)
 
+                    if next_char == '"':
+                        self.warning("unexpected '\"' after identifier", column=self.col_num+1)
+                        break
+
                     if token.value in Tokens.keywords:
                         token.type = Tokens.Type.KEYWORD
                     else:

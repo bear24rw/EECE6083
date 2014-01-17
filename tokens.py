@@ -9,6 +9,7 @@ class Tokens:
     ]
 
     keywords = [
+        'integer',
         'string',
         'int',
         'bool',
@@ -19,10 +20,8 @@ class Tokens:
         'if',
         'then',
         'else',
-        'case',
+        'is',
         'for',
-        'and',
-        'or',
         'not',
         'program',
         'procedure',

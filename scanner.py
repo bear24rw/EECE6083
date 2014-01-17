@@ -174,17 +174,20 @@ class Scanner:
                     token = Tokens.Token()
                     token.type = Tokens.Type.STRING
 
-                    while next_char != '"' and next_char != '\n':
+                    while next_char.isalnum() or next_char in " _,;:.'":
                         token.value += next_char
                         char, next_char = next(col_iter)
-
-                    # consume the trailing quotation mark
-                    if next_char == '"':
-                        next(col_iter)
 
                     if next_char == '\n':
                         self.warning("unexpected EOL while scanning string literal")
                         break
+
+                    if not next_char == '"':
+                        self.warning("illegal string character '%s'" % next_char)
+                        break
+
+                    # consume the trailing quotation mark
+                    next(col_iter)
 
                     yield token
 

@@ -17,13 +17,23 @@ class Scanner:
 
         self.line_num = 0
         self.col_num = 0
+        self.has_error = False
 
     def warning(self, message, column=None):
+
+        self.print_message(message, "warning", column, Color.YELLOW)
+
+    def error(self, message, column=None):
+
+        self.has_error = True
+        self.print_message(message, "error", column, Color.RED)
+
+    def print_message(self, message, label="info", column=None, color=Color.WHITE):
 
         if column is None:
             column = self.col_num
 
-        print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (self.filename, self.line_num, column) + Color.YELLOW + "warning: " + Color.WHITE + message
+        print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (self.filename, self.line_num, column) + color + "%s: " % label + Color.WHITE + message
         print Color.DEFAULT + self.line.strip()
         print Color.GREEN + "%s^" % (' '*(column-1)) + Color.DEFAULT
 
@@ -180,7 +190,7 @@ class Scanner:
 
                     continue
 
-                self.warning("Unsupported character")
+                self.error("Unsupported character")
 
         # return an EOF token since we are done
         yield Tokens.Token(Tokens.Type.SPECIAL, 'EOF')

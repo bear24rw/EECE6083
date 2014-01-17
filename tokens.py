@@ -33,6 +33,7 @@ class Tokens:
         STRING      = "STRING"
         SYMBOL      = "SYMBOL"
         COMMENT     = "COMMENT"
+        SPECIAL     = "SPECIAL"
 
     class Token(object):
 

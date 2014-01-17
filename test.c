@@ -17,7 +17,7 @@ int array[3] = {1, 2, 3};
 if (zz <> 234) then
     print "asdf"
 endif
-
+x = ~x;
 x = z + 5s;
 fd43 = 53
 _asdf = 43

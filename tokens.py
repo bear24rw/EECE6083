@@ -1,12 +1,12 @@
 class Tokens:
 
-    arith_ops = ['=', '+', '-', '*', '/', '%']
-    comp_ops = ['==', '!=', '<>', '>', '<', '>=', '<=']
-    logic_ops = ['!', '&&', '||']
-    brackets = ['(', ')', '[', ']', '{', '}']
-    special = [',', ';']
-
-    symbols = arith_ops + comp_ops + logic_ops + brackets + special
+    symbols = [
+        ':', ';', ',',
+        '+', '-', '*', '/',
+        '(', ')', '{', '}',
+        '<', '<=', '>', '>=',
+        '!=', '=', ':=',
+    ]
 
     keywords = [
             'function',

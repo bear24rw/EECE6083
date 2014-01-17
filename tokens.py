@@ -42,11 +42,11 @@ class Tokens:
 
     class Token(object):
 
-        def __init__(self, _type=None, _value=""):
-            self.filename = ""
-            self.line_str = ""
-            self.line_num = 0
-            self.line_col = 0
+        def __init__(self, scanner, _type=None, _value=""):
+            self.filename = scanner.filename
+            self.line_str = scanner.line
+            self.line_num = scanner.line_num
+            self.line_col = scanner.col_num
             self.value = _value
             self.type = _type
 

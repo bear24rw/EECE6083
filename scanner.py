@@ -73,7 +73,7 @@ class Scanner:
                 """
                 if char == "/" and next_char == "/":
 
-                    token = Tokens.Token()
+                    token = Tokens.Token(self)
                     token.type = Tokens.Type.COMMENT
 
                     # consume until end of the line
@@ -91,7 +91,7 @@ class Scanner:
 
                 if any(x.startswith(char) for x in Tokens.symbols):
 
-                    token = Tokens.Token()
+                    token = Tokens.Token(self)
                     token.type = Tokens.Type.SYMBOL
                     token.value = char
 
@@ -109,7 +109,7 @@ class Scanner:
 
                 if char.isalpha() or char == "_":
 
-                    token = Tokens.Token()
+                    token = Tokens.Token(self)
                     token.value += char
 
                     while next_char.isalnum() or next_char == '_':
@@ -131,7 +131,7 @@ class Scanner:
 
                 if char.isdigit():
 
-                    token = Tokens.Token()
+                    token = Tokens.Token(self)
                     token.type = Tokens.Type.CONSTANT
                     token.value += char
 
@@ -171,7 +171,7 @@ class Scanner:
 
                 if char == '"':
 
-                    token = Tokens.Token()
+                    token = Tokens.Token(self)
                     token.type = Tokens.Type.STRING
 
                     while next_char.isalnum() or next_char in " _,;:.'":
@@ -196,7 +196,7 @@ class Scanner:
                 self.error("unsupported character '%s'" % char)
 
         # return an EOF token since we are done
-        yield Tokens.Token(Tokens.Type.SPECIAL, 'EOF')
+        yield Tokens.Token(self, Tokens.Type.SPECIAL, 'EOF')
 
 if __name__ == "__main__":
     scanner = Scanner(sys.argv[1])

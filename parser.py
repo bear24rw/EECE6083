@@ -195,7 +195,7 @@ class Parser:
         if not name:
             return None
 
-        if not self.global_symbols[name]:
+        if not name in self.global_symbols:
             self.error("destination identifier undefined")
             return None
 
@@ -207,7 +207,22 @@ class Parser:
                          | <expression> | <arith_op>
                          | [not] <arith_op>
         """
-        return self.arith_op()
+        hasnot =  self.match(Tokens.Type.KEYWORD, 'not')
+
+        addr_1, type_1 = self.arith_op()
+
+        if hasnot:
+            addr_1 = self.gen.set_new_reg("~R[%d]" % addr_1)
+
+        while self.match(Tokens.Type.SYMBOL, '&') or self.match(Tokens.Type.SYMBOL, '|'):
+            operation = self.matched_token.value
+            addr_2, type_2 = self.arith_op()
+            if type_1 != type_2:
+                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
+                return (None, None)
+            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
+
+        return (addr_1, type_1)
 
     def arith_op(self):
         """

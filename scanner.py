@@ -160,7 +160,7 @@ class Scanner:
                         break
 
                     if '.' in token.value:
-                        token.type = Token.Type.FLOAT
+                        token.type = Tokens.Type.FLOAT
 
                     yield token
 

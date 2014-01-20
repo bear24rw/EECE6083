@@ -39,8 +39,7 @@ class Parser:
         col_num = self.token.col_num
         line_num = self.token.line_num
         filename = self.token.filename
-        line_str = self.token.line_str.strip()
-
+        line_str = self.token.line_str
 
         print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (filename, line_num, col_num) + color + "%s: " % label + Color.WHITE + message
         print Color.DEFAULT + line_str
@@ -168,12 +167,15 @@ class Parser:
 
         destination = self.destination()
         if not destination:
-            return None
+            return False
 
         if not self.match(Tokens.Type.SYMBOL, ':='):
-            return None
+            return False
 
         exp_addr, exp_type = self.expression()
+
+        if not exp_addr:
+            return False
 
         self.gen.write("M[%d] = R[%d]" % (destination.addr, exp_addr))
 
@@ -212,6 +214,8 @@ class Parser:
         <arith_op> ::=   <arith_op> + <relation>
                        | <arith_op> - <relation>
                        | <relation>
+
+        Returns the register address and type of the result: (register_address, type)
         """
 
         addr_1, type_1 = self.relation()
@@ -221,6 +225,7 @@ class Parser:
             addr_2, type_2 = self.relation()
             if type_1 != type_2:
                 self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
+                return (None, None)
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
@@ -251,6 +256,7 @@ class Parser:
             addr_2, type_2 = self.factor()
             if type_1 != type_2:
                 self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
+                return (None, None)
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
@@ -269,9 +275,9 @@ class Parser:
         """
 
         if self.match(Tokens.Type.SYMBOL, '('):
-            self.expression()
+            addr, type = self.expression()
             self.match(Tokens.Type.SYMBOL, ')')
-            return
+            return (addr, type)
 
         if self.match(Tokens.Type.SYMBOL, '-'):
             negate = True
@@ -310,7 +316,8 @@ class Parser:
         if self.match(Tokens.Type.KEYWORD, 'true'): return self.matched_token
         if self.match(Tokens.Type.KEYWORD, 'false'): return self.matched_token
 
-        return None
+        self.error("expected factor")
+        return (None, None)
 
     def name(self):
         """

@@ -45,7 +45,7 @@ class Tokens:
             self.filename = scanner.filename
             self.line_str = scanner.line
             self.line_num = scanner.line_num
-            self.line_col = scanner.col_num
+            self.col_num = scanner.col_num
             self.value = _value
             self.type = _type
 

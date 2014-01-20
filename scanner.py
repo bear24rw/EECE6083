@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-import sys
 from itertools import izip_longest
 from color import Color
 from tokens import Tokens
@@ -203,6 +202,7 @@ class Scanner:
         yield Tokens.Token(self, Tokens.Type.SPECIAL, 'EOF')
 
 if __name__ == "__main__":
+    import sys
     scanner = Scanner(sys.argv[1])
     for token in scanner.token_iter():
         print token

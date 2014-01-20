@@ -23,6 +23,7 @@ class Parser:
         self.get_next_token()
 
         self.global_symbols = {}
+        self.matched_token = None
 
     def warning(self, message):
 
@@ -55,12 +56,14 @@ class Parser:
             #print "Match successful"
             if value:
                 if self.token.value == value:
+                    self.matched_token = self.token
                     self.get_next_token()
                     return True
                 else:
                     return False
             else:
                 value = self.token.value
+                self.matched_token = self.token
                 self.get_next_token()
                 return value
         else:
@@ -210,19 +213,15 @@ class Parser:
                        | <arith_op> - <relation>
                        | <relation>
         """
+
         addr_1, type_1 = self.relation()
 
-        while self.match(Tokens.Type.SYMBOL, '+'):
+        while self.match(Tokens.Type.SYMBOL, '+') or self.match(Tokens.Type.SYMBOL, '-'):
+            operation = self.matched_token.value
             addr_2, type_2 = self.relation()
             if type_1 != type_2:
                 self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] + R[%d]" % (addr_1, addr_2))
-
-        while self.match(Tokens.Type.SYMBOL, '-'):
-            addr_2, type_2 = self.relation()
-            if type_1 != type_2:
-                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] - R[%d]" % (addr_1, addr_2))
+            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
 
@@ -247,17 +246,12 @@ class Parser:
 
         addr_1, type_1 = self.factor()
 
-        while self.match(Tokens.Type.SYMBOL, '*'):
+        while self.match(Tokens.Type.SYMBOL, '*') or self.match(Tokens.Type.SYMBOL, '/'):
+            operation = self.matched_token.value
             addr_2, type_2 = self.factor()
             if type_1 != type_2:
                 self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] * R[%d]" % (addr_1, addr_2))
-
-        while self.match(Tokens.Type.SYMBOL, '/'):
-            addr_2, type_2 = self.factor()
-            if type_1 != type_2:
-                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] / R[%d]" % (addr_1, addr_2))
+            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
 
@@ -284,37 +278,37 @@ class Parser:
         else:
             negate = False
 
-        # save the current token since the
-        # match() function might eat it
-        token = self.token
-
         """
         Identifiers
         """
         if self.match(Tokens.Type.IDENTIFIER):
-            if not token.value in self.global_symbols:
+            if not self.matched_token.value in self.global_symbols:
                 self.error("undefined identifier")
                 return None
-            addr = self.gen.set_new_reg("M[%d]" % self.global_symbols[token.value].addr)
-            return (addr, self.global_symbols[token.value].type)
+            addr = self.gen.set_new_reg("M[%d]" % self.global_symbols[self.matched_token.value].addr)
+            if negate:
+                addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
+            return (addr, self.global_symbols[self.matched_token.value].type)
 
         """
         Numbers
         """
         if self.match(Tokens.Type.INTEGER) or self.match(Tokens.Type.FLOAT):
-            addr = self.gen.set_new_reg(token.value)
-            return (addr, token.type)
+            addr = self.gen.set_new_reg(self.matched_token.value)
+            if negate:
+                addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
+            return (addr, self.matched_token.type)
 
         """
         String
         """
-        if self.match(Tokens.Type.STRING): return token
+        if self.match(Tokens.Type.STRING): return self.matched_token
 
         """
         Bool
         """
-        if self.match(Tokens.Type.KEYWORD, 'true'): return token
-        if self.match(Tokens.Type.KEYWORD, 'false'): return token
+        if self.match(Tokens.Type.KEYWORD, 'true'): return self.matched_token
+        if self.match(Tokens.Type.KEYWORD, 'false'): return self.matched_token
 
         return None
 

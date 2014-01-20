@@ -129,13 +129,13 @@ class Scanner:
                     continue
 
                 """
-                Constants
+                Numbers
                 """
 
                 if char.isdigit():
 
                     token = Tokens.Token(self)
-                    token.type = Tokens.Type.CONSTANT
+                    token.type = Tokens.Type.INTEGER
                     token.value += char
 
                     while next_char.isdigit() or next_char == '.':
@@ -148,16 +148,19 @@ class Scanner:
                         break
 
                     if next_char.isalpha():
-                        self.warning("expected constant but found '%s'" % next_char, column=self.col_num+1)
+                        self.warning("expected number but found '%s'" % next_char, column=self.col_num+1)
                         break
 
                     if next_char == '"':
-                        self.warning("unexpected '\"' after constant", column=self.col_num+1)
+                        self.warning("unexpected '\"' after number", column=self.col_num+1)
                         break
 
                     if token.value.endswith('.'):
                         self.warning("number cannot end with decimal point")
                         break
+
+                    if '.' in token.value:
+                        token.type = Token.Type.FLOAT
 
                     yield token
 

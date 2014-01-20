@@ -141,10 +141,10 @@ class Parser:
         """
         <type_mark> ::= integer|float|bool|string
         """
-        if self.match(Tokens.Type.KEYWORD, 'integer'): return 'integer'
-        if self.match(Tokens.Type.KEYWORD, 'float'): return 'float'
-        if self.match(Tokens.Type.KEYWORD, 'bool'): return 'bool'
-        if self.match(Tokens.Type.KEYWORD, 'string'): return 'string'
+        if self.match(Tokens.Type.KEYWORD, 'integer'): return 'INTEGER'
+        if self.match(Tokens.Type.KEYWORD, 'float'): return 'FLOAT'
+        if self.match(Tokens.Type.KEYWORD, 'bool'): return 'BOOL'
+        if self.match(Tokens.Type.KEYWORD, 'string'): return 'STRING'
         return None
 
     def statement(self):
@@ -215,13 +215,13 @@ class Parser:
         while self.match(Tokens.Type.SYMBOL, '+'):
             addr_2, type_2 = self.relation()
             if type_1 != type_2:
-                self.error("type error")
+                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] + R[%d]" % (addr_1, addr_2))
 
         while self.match(Tokens.Type.SYMBOL, '-'):
             addr_2, type_2 = self.relation()
             if type_1 != type_2:
-                self.error("type error")
+                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] - R[%d]" % (addr_1, addr_2))
 
         return (addr_1, type_1)
@@ -250,13 +250,13 @@ class Parser:
         while self.match(Tokens.Type.SYMBOL, '*'):
             addr_2, type_2 = self.factor()
             if type_1 != type_2:
-                self.error("type error")
+                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] * R[%d]" % (addr_1, addr_2))
 
         while self.match(Tokens.Type.SYMBOL, '/'):
             addr_2, type_2 = self.factor()
             if type_1 != type_2:
-                self.error("type error")
+                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] / R[%d]" % (addr_1, addr_2))
 
         return (addr_1, type_1)
@@ -296,12 +296,12 @@ class Parser:
                 self.error("undefined identifier")
                 return None
             addr = self.gen.set_new_reg("M[%d]" % self.global_symbols[token.value].addr)
-            return (addr, token.type)
+            return (addr, self.global_symbols[token.value].type)
 
         """
         Numbers
         """
-        if self.match(Tokens.Type.CONSTANT):
+        if self.match(Tokens.Type.INTEGER) or self.match(Tokens.Type.FLOAT):
             addr = self.gen.set_new_reg(token.value)
             return (addr, token.type)
 

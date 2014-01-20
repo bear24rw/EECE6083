@@ -33,7 +33,8 @@ class Tokens:
     class Type():
         KEYWORD     = "KEYWORD"
         IDENTIFIER  = "IDENTIFIER"
-        CONSTANT    = "CONSTANT"
+        INTEGER     = "INTEGER"
+        FLOAT       = "FLOAT"
         STRING      = "STRING"
         SYMBOL      = "SYMBOL"
         COMMENT     = "COMMENT"

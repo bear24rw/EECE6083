@@ -116,7 +116,7 @@ class Scanner:
                         char, next_char = next(col_iter)
 
                     if next_char == '"':
-                        self.warning("unexpected '\"' after identifier", column=self.col_num+1)
+                        self.error("unexpected '\"' after identifier", column=self.col_num+1)
                         break
 
                     if token.value in Tokens.keywords:
@@ -132,11 +132,15 @@ class Scanner:
                 Numbers
                 """
 
-                if char.isdigit():
+                if char.isdigit() or char == '.':
 
                     token = Tokens.Token(self)
                     token.type = Tokens.Type.INTEGER
                     token.value += char
+
+                    if char == '.':
+                        self.warning("number should not start with decimal point, inserting leading '0'")
+                        token.value = '0' + token.value
 
                     while next_char.isdigit() or next_char == '.':
                         token.value += next_char
@@ -144,20 +148,20 @@ class Scanner:
                         char, next_char = next(col_iter)
 
                     if token.value.count('.') == 2:
-                        self.warning("too many decimals", column=self.col_num+1)
+                        self.error("too many decimals", column=self.col_num+1)
                         break
 
                     if next_char.isalpha():
-                        self.warning("expected number but found '%s'" % next_char, column=self.col_num+1)
+                        self.error("expected number but found '%s'" % next_char, column=self.col_num+1)
                         break
 
                     if next_char == '"':
-                        self.warning("unexpected '\"' after number", column=self.col_num+1)
+                        self.error("unexpected '\"' after number", column=self.col_num+1)
                         break
 
                     if token.value.endswith('.'):
-                        self.warning("number cannot end with decimal point")
-                        break
+                        self.warning("number should not end with decimal point, inserting trailing '0'")
+                        token.value += '0'
 
                     if '.' in token.value:
                         token.type = Tokens.Type.FLOAT
@@ -165,11 +169,6 @@ class Scanner:
                     yield token
 
                     continue
-
-                # check for number starting with decimal
-                if char == '.':
-                    self.warning("unexpected decimal")
-                    break
 
                 """
                 String Literal
@@ -185,11 +184,11 @@ class Scanner:
                         char, next_char = next(col_iter)
 
                     if next_char == '\n':
-                        self.warning("unexpected EOL while scanning string literal")
+                        self.error("unexpected EOL while scanning string literal", column=self.col_num+1)
                         break
 
                     if not next_char == '"':
-                        self.warning("illegal string character '%s'" % next_char)
+                        self.error("illegal string character '%s'" % next_char, column=self.col_num+1)
                         break
 
                     # consume the trailing quotation mark

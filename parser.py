@@ -145,7 +145,7 @@ class Parser:
                 continue
 
             if not self.match(Tokens.Type.SYMBOL, ";"):
-                self.error("expected ';' but found '%s'" % self.matched_token.value)
+                self.error("expected ';' after statement ", token=self.prev_token)
                 continue
 
             # don't use match() since it might iterate past end
@@ -362,7 +362,9 @@ class Parser:
 
         if self.match(Tokens.Type.SYMBOL, '('):
             addr, type = self.expression()
-            self.match(Tokens.Type.SYMBOL, ')')
+            if not self.match(Tokens.Type.SYMBOL, ')'):
+                self.error("expected ')'")
+                return (None, None)
             return (addr, type)
 
         if self.match(Tokens.Type.SYMBOL, '-'):

@@ -286,6 +286,7 @@ class Parser:
         while self.match(Tokens.Type.SYMBOL, '&') or self.match(Tokens.Type.SYMBOL, '|'):
             operation = self.matched_token.value
             addr_2, type_2 = self.arith_op()
+            if addr_2 is None: return (None, None)
             if type_1 != type_2:
                 self.error("expression type error. '%s' and '%s' incompatible." % (type_1, type_2))
                 return (None, None)
@@ -405,8 +406,8 @@ class Parser:
         """
         Bool
         """
-        if self.match(Tokens.Type.KEYWORD, 'true'): return self.matched_token
-        if self.match(Tokens.Type.KEYWORD, 'false'): return self.matched_token
+        if self.match(Tokens.Type.BOOL, 'true'): return (1, Tokens.Type.BOOL)
+        if self.match(Tokens.Type.BOOL, 'false'): return (1, Tokens.Type.BOOL)
 
         self.error("expected factor but found '%s'" % self.token.value)
         return (None, None)

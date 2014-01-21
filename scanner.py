@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+
 from itertools import izip_longest
 from color import Color
 from tokens import Tokens

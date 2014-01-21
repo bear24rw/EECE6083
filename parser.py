@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 from tokens import Tokens
 from color import Color
 
@@ -174,7 +176,7 @@ class Parser:
 
         exp_addr, exp_type = self.expression()
 
-        if not exp_addr:
+        if exp_addr is None:
             return False
 
         self.gen.write("M[%d] = R[%d]" % (destination.addr, exp_addr))
@@ -218,7 +220,7 @@ class Parser:
             operation = self.matched_token.value
             addr_2, type_2 = self.arith_op()
             if type_1 != type_2:
-                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
+                self.error("expression type error. '%s' and '%s' incompatible." % (type_1, type_2))
                 return (None, None)
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
@@ -235,11 +237,14 @@ class Parser:
 
         addr_1, type_1 = self.relation()
 
+        if addr_1 is None: return (None, None)
+
         while self.match(Tokens.Type.SYMBOL, '+') or self.match(Tokens.Type.SYMBOL, '-'):
             operation = self.matched_token.value
             addr_2, type_2 = self.relation()
+            if addr_2 is None: return (None, None)
             if type_1 != type_2:
-                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
+                self.error("arith_op type error. '%s' and '%s' incompatible." % (type_1, type_2))
                 return (None, None)
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
@@ -266,9 +271,12 @@ class Parser:
 
         addr_1, type_1 = self.factor()
 
+        if addr_1 is None: return (None, None)
+
         while self.match(Tokens.Type.SYMBOL, '*') or self.match(Tokens.Type.SYMBOL, '/'):
             operation = self.matched_token.value
             addr_2, type_2 = self.factor()
+            if addr_2 is None: return (None, None)
             if type_1 != type_2:
                 self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
                 return (None, None)
@@ -331,7 +339,7 @@ class Parser:
         if self.match(Tokens.Type.KEYWORD, 'true'): return self.matched_token
         if self.match(Tokens.Type.KEYWORD, 'false'): return self.matched_token
 
-        self.error("expected factor")
+        self.error("expected factor but found '%s'" % self.token.value)
         return (None, None)
 
     def name(self):

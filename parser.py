@@ -249,6 +249,8 @@ class Parser:
         if not self.match(Tokens.Type.SYMBOL, ':='):
             return False
 
+        self.global_symbols[dest_name].used = True
+
         exp_addr, exp_type = self.expression()
 
         if exp_addr is None:
@@ -258,7 +260,6 @@ class Parser:
             raise ParseError("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type))
 
         self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
-        self.global_symbols[dest_name].used = True
 
         return True
 

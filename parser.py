@@ -11,6 +11,8 @@ class Symbol:
         self.name = name
         self.type = type
         self.addr = Symbol.current_addr
+        self.used = False
+
         Symbol.current_addr += 1
 
     def __repr__(self):
@@ -230,7 +232,7 @@ class Parser:
         <assignment_statement> ::= <destination> := <expression>
         """
 
-        dest_addr, dest_type = self.destination()
+        dest_name, dest_addr, dest_type = self.destination()
         if dest_addr is None:
             return False
 
@@ -247,6 +249,7 @@ class Parser:
             return False
 
         self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
+        self.global_symbols[dest_name].used = True
 
         return True
 
@@ -268,7 +271,7 @@ class Parser:
             self.error("destination identifier undefined")
             return (None, None)
 
-        return (name, self.global_symbols[name].type)
+        return (name, self.global_symbols[name].addr, self.global_symbols[name].type)
 
     def expression(self):
         """
@@ -279,6 +282,9 @@ class Parser:
         hasnot =  self.match(Tokens.Type.KEYWORD, 'not')
 
         addr_1, type_1 = self.arith_op()
+
+        if addr_1 is None:
+            return (None, None)
 
         if hasnot:
             addr_1 = self.gen.set_new_reg("~R[%d]" % addr_1)
@@ -381,13 +387,22 @@ class Parser:
         Identifiers
         """
         if self.match(Tokens.Type.IDENTIFIER):
-            if not self.matched_token.value in self.global_symbols:
-                self.error("undefined identifier")
-                return None
-            addr = self.gen.set_new_reg("M[%d]" % self.global_symbols[self.matched_token.value].addr)
+
+            name = self.matched_token.value
+
+            if not name in self.global_symbols:
+                self.error("undefined identifier", token=self.prev_token)
+                return (None, None)
+
+            if not self.global_symbols[name].used:
+                self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
+
+            addr = self.gen.set_new_reg("M[%d]" % self.global_symbols[name].addr)
+
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
-            return (addr, self.global_symbols[self.matched_token.value].type)
+
+            return (addr, self.global_symbols[name].type)
 
         """
         Numbers

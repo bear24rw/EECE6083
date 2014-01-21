@@ -275,27 +275,43 @@ class Parser:
 
         return (name, self.global_symbols[name].addr, self.global_symbols[name].type)
 
+    def operation(self, lhs, operations, rhs, result_is_bool=False):
+        """
+        Helper function to perform the generic function: R[x] op R[y]
+        'lhs' is a 2-tuple containing the (register_addr, type) for the left hand side of the operator
+        'rhs' is the function to handle the right hand side of the operator
+        'operations' contains a list of valid operator symbols
+        'result_is_bool' is set to true if the operation results in a boolean
+        """
+
+        lhs_addr, lhs_type = lhs
+
+        while any([self.match(Tokens.Type.SYMBOL, op) for op in operations]):
+            operation = self.matched_token.value
+            rhs_addr, rhs_type = rhs()
+            if lhs_type != rhs_type:
+                raise ParseError("expression type error. '%s' and '%s' incompatible." % (lhs_type, rhs_type))
+            lhs_addr = self.gen.set_new_reg("R[%d] %s R[%d]" % (lhs_addr, operation, rhs_addr))
+            if result_is_bool:
+                lhs_type = Tokens.Type.BOOL
+
+        return (lhs_addr, lhs_type)
+
     def expression(self):
         """
         <expression> ::=   <expression> & <arith_op>
                          | <expression> | <arith_op>
                          | [not] <arith_op>
         """
+
         hasnot =  self.match(Tokens.Type.KEYWORD, 'not')
 
-        addr_1, type_1 = self.arith_op()
+        addr, type = self.arith_op()
 
         if hasnot:
-            addr_1 = self.gen.set_new_reg("~R[%d]" % addr_1)
+            addr = self.gen.set_new_reg("~R[%d]" % addr)
 
-        while self.match(Tokens.Type.SYMBOL, '&') or self.match(Tokens.Type.SYMBOL, '|'):
-            operation = self.matched_token.value
-            addr_2, type_2 = self.arith_op()
-            if type_1 != type_2:
-                raise ParseError("expression type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
-
-        return (addr_1, type_1)
+        return self.operation((addr, type), ('&', '|'), self.arith_op)
 
     def arith_op(self):
         """
@@ -303,19 +319,9 @@ class Parser:
                        | <arith_op> - <relation>
                        | <relation>
 
-        Returns the register address and type of the result: (register_address, type)
         """
-
-        addr_1, type_1 = self.relation()
-
-        while self.match(Tokens.Type.SYMBOL, '+') or self.match(Tokens.Type.SYMBOL, '-'):
-            operation = self.matched_token.value
-            addr_2, type_2 = self.relation()
-            if type_1 != type_2:
-                raise ParseError("arith_op type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
-
-        return (addr_1, type_1)
+        lhs = self.relation()
+        return self.operation(lhs, ('+', '-'), self.relation)
 
     def relation(self):
         """
@@ -327,23 +333,10 @@ class Parser:
                        | <relation> != <term>
                        | <term>
         """
+        lhs = self.term()
+        ops = ('<', '>=', '<=', '>', '==', '!=')
+        return self.operation(lhs, ops, self.term, result_is_bool=True)
 
-        addr_1, type_1 = self.term()
-
-        while self.match(Tokens.Type.SYMBOL, '<')  or \
-              self.match(Tokens.Type.SYMBOL, '>=') or \
-              self.match(Tokens.Type.SYMBOL, '<=') or \
-              self.match(Tokens.Type.SYMBOL, '>')  or \
-              self.match(Tokens.Type.SYMBOL, '==') or \
-              self.match(Tokens.Type.SYMBOL, '!='):
-            operation = self.matched_token.value
-            addr_2, type_2 = self.term()
-            if type_1 != type_2:
-                raise ParseError("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
-            type_1 = Tokens.Type.BOOL
-
-        return (addr_1, type_1)
 
     def term(self):
         """
@@ -351,17 +344,9 @@ class Parser:
                    | <term> / <factor>
                    | <factor>
         """
+        lhs = self.factor()
+        return self.operation(lhs, ('*', '/'), self.factor)
 
-        addr_1, type_1 = self.factor()
-
-        while self.match(Tokens.Type.SYMBOL, '*') or self.match(Tokens.Type.SYMBOL, '/'):
-            operation = self.matched_token.value
-            addr_2, type_2 = self.factor()
-            if type_1 != type_2:
-                raise ParseError("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
-
-        return (addr_1, type_1)
 
     def factor(self):
         """

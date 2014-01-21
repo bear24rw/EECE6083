@@ -61,12 +61,16 @@ class Parser:
         print Color.GREEN + "%s^" % (' '*(col_num-1)) + Color.DEFAULT
 
     def get_next_token(self):
-        self.prev_token = self.token
-        self.token = next(self.tokens)
 
-        # skip the special new line tokens
-        while self.token.value == '\n':
+        self.prev_token = self.token
+
+        while True:
             self.token = next(self.tokens)
+            if self.token.type == Tokens.Type.COMMENT:
+                continue
+            if self.token.value == '\n':
+                continue
+            break
 
         #print "Current token: <%s,%r>" % (self.token.type, self.token.value)
 

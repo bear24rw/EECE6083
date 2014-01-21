@@ -68,7 +68,7 @@ class Parser:
         while self.token.value == '\n':
             self.token = next(self.tokens)
 
-        print "Current token: <%s,%r>" % (self.token.type, self.token.value)
+        #print "Current token: <%s,%r>" % (self.token.type, self.token.value)
 
     def match(self, type, value=None):
         #print "Trying to match <%s> with <%s>" % (type, self.token.type)
@@ -107,6 +107,7 @@ class Parser:
         """
         self.program_header()
         self.program_body()
+        print "Finished Parsing"
 
     def program_header(self):
         """
@@ -326,7 +327,23 @@ class Parser:
                        | <relation> != <term>
                        | <term>
         """
-        return self.term()
+
+        addr_1, type_1 = self.term()
+
+        while self.match(Tokens.Type.SYMBOL, '<')  or \
+              self.match(Tokens.Type.SYMBOL, '>=') or \
+              self.match(Tokens.Type.SYMBOL, '<=') or \
+              self.match(Tokens.Type.SYMBOL, '>')  or \
+              self.match(Tokens.Type.SYMBOL, '==') or \
+              self.match(Tokens.Type.SYMBOL, '!='):
+            operation = self.matched_token.value
+            addr_2, type_2 = self.term()
+            if type_1 != type_2:
+                raise ParseError("type error. '%s' and '%s' incompatible." % (type_1, type_2))
+            addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
+            type_1 = Tokens.Type.BOOL
+
+        return (addr_1, type_1)
 
     def term(self):
         """
@@ -438,6 +455,7 @@ if __name__ == "__main__":
         print "BUILD FAILED"
         sys.exit(1)
 
+    print ""
     print "Global Symbols"
     print "-"*50
     for x in parser.global_symbols:

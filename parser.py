@@ -18,6 +18,11 @@ class Symbol:
     def __repr__(self):
         return "<%r, %r, %r>" % (self.name, self.type, self.addr)
 
+class ParseError(Exception):
+    def __init__(self, message, token=None):
+        self.message = message
+        self.token = token
+
 class Parser:
 
     def __init__(self, scanner, gen):
@@ -124,8 +129,10 @@ class Parser:
             if self.match(Tokens.Type.KEYWORD, 'begin'):
                 break
 
-            # if its not a declaration just skip to the next line
-            if not self.declaration():
+            try:
+                self.declaration()
+            except ParseError as e:
+                self.error(e.message, e.token)
                 self.skip_line()
                 continue
 
@@ -142,7 +149,10 @@ class Parser:
             if self.match(Tokens.Type.KEYWORD, 'end'):
                 break
 
-            if not self.statement():
+            try:
+                self.statement()
+            except ParseError as e:
+                self.error(e.message, e.token)
                 self.skip_line()
                 continue
 
@@ -173,10 +183,7 @@ class Parser:
         is_pro = self.procedure_declaration(is_global)
 
         if not is_var and not is_pro:
-            self.error("expected variable or procedure declaration")
-            return False
-
-        return True
+            raise ParseError("expected variable or procedure declaration")
 
     def procedure_declaration(self, isglobal):
         return False
@@ -193,14 +200,12 @@ class Parser:
 
         name = self.match(Tokens.Type.IDENTIFIER)
         if not name:
-            self.error("expected identifier but found '%s'" % self.token.type)
-            return False
+            raise ParseError("expected identifier but found '%s'" % self.token.type)
 
         if isglobal:
 
             if name in self.global_symbols:
-                self.error("duplicate declaration")
-                return False
+                raise ParseError("duplicate declaration")
 
             self.global_symbols[name] = Symbol(name, typemark)
 
@@ -245,8 +250,7 @@ class Parser:
             return False
 
         if dest_type != exp_type:
-            self.error("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type))
-            return False
+            raise ParseError("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type))
 
         self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
         self.global_symbols[dest_name].used = True
@@ -264,12 +268,9 @@ class Parser:
         """
 
         name = self.match(Tokens.Type.IDENTIFIER)
-        if not name:
-            return (None, None)
 
         if not name in self.global_symbols:
-            self.error("destination identifier undefined")
-            return (None, None)
+            raise ParseError("destination identifier undefined", self.prev_token)
 
         return (name, self.global_symbols[name].addr, self.global_symbols[name].type)
 
@@ -283,19 +284,14 @@ class Parser:
 
         addr_1, type_1 = self.arith_op()
 
-        if addr_1 is None:
-            return (None, None)
-
         if hasnot:
             addr_1 = self.gen.set_new_reg("~R[%d]" % addr_1)
 
         while self.match(Tokens.Type.SYMBOL, '&') or self.match(Tokens.Type.SYMBOL, '|'):
             operation = self.matched_token.value
             addr_2, type_2 = self.arith_op()
-            if addr_2 is None: return (None, None)
             if type_1 != type_2:
-                self.error("expression type error. '%s' and '%s' incompatible." % (type_1, type_2))
-                return (None, None)
+                raise ParseError("expression type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
@@ -311,15 +307,11 @@ class Parser:
 
         addr_1, type_1 = self.relation()
 
-        if addr_1 is None: return (None, None)
-
         while self.match(Tokens.Type.SYMBOL, '+') or self.match(Tokens.Type.SYMBOL, '-'):
             operation = self.matched_token.value
             addr_2, type_2 = self.relation()
-            if addr_2 is None: return (None, None)
             if type_1 != type_2:
-                self.error("arith_op type error. '%s' and '%s' incompatible." % (type_1, type_2))
-                return (None, None)
+                raise ParseError("arith_op type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
@@ -345,15 +337,11 @@ class Parser:
 
         addr_1, type_1 = self.factor()
 
-        if addr_1 is None: return (None, None)
-
         while self.match(Tokens.Type.SYMBOL, '*') or self.match(Tokens.Type.SYMBOL, '/'):
             operation = self.matched_token.value
             addr_2, type_2 = self.factor()
-            if addr_2 is None: return (None, None)
             if type_1 != type_2:
-                self.error("type error. '%s' and '%s' incompatible." % (type_1, type_2))
-                return (None, None)
+                raise ParseError("type error. '%s' and '%s' incompatible." % (type_1, type_2))
             addr_1 = self.gen.set_new_reg("R[%d] %s R[%d]" % (addr_1, operation, addr_2))
 
         return (addr_1, type_1)
@@ -374,8 +362,7 @@ class Parser:
         if self.match(Tokens.Type.SYMBOL, '('):
             addr, type = self.expression()
             if not self.match(Tokens.Type.SYMBOL, ')'):
-                self.error("expected ')'")
-                return (None, None)
+                raise ParseError("expected ')'")
             return (addr, type)
 
         if self.match(Tokens.Type.SYMBOL, '-'):
@@ -391,8 +378,7 @@ class Parser:
             name = self.matched_token.value
 
             if not name in self.global_symbols:
-                self.error("undefined identifier", token=self.prev_token)
-                return (None, None)
+                raise ParseError("undefined identifier", token=self.prev_token)
 
             if not self.global_symbols[name].used:
                 self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
@@ -429,8 +415,7 @@ class Parser:
                 addr = self.gen.set_new_reg("0")
             return (addr, Tokens.Type.BOOL)
 
-        self.error("expected factor but found '%s'" % self.token.value)
-        return (None, None)
+        raise ParseError("expected factor but found '%s'" % self.token.value)
 
     def name(self):
         """

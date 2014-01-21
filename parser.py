@@ -406,8 +406,13 @@ class Parser:
         """
         Bool
         """
-        if self.match(Tokens.Type.BOOL, 'true'): return (1, Tokens.Type.BOOL)
-        if self.match(Tokens.Type.BOOL, 'false'): return (1, Tokens.Type.BOOL)
+        if self.match(Tokens.Type.BOOL):
+            value = self.matched_token.value
+            if value == 'true':
+                addr = self.gen.set_new_reg("1")
+            else:
+                addr = self.gen.set_new_reg("0")
+            return (addr, Tokens.Type.BOOL)
 
         self.error("expected factor but found '%s'" % self.token.value)
         return (None, None)

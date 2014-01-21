@@ -125,6 +125,7 @@ class Scanner:
 
                     if next_char == '"':
                         self.error("unexpected '\"' after identifier", column=self.col_num+1)
+                        yield Tokens.Token(self, Tokens.Type.INVALID)
                         break
 
                     if token.value in ['true', 'false']:
@@ -159,14 +160,17 @@ class Scanner:
 
                     if token.value.count('.') == 2:
                         self.error("too many decimals", column=self.col_num+1)
+                        yield Tokens.Token(self, Tokens.Type.INVALID)
                         break
 
                     if next_char.isalpha():
                         self.error("expected number but found '%s'" % next_char, column=self.col_num+1)
+                        yield Tokens.Token(self, Tokens.Type.INVALID)
                         break
 
                     if next_char == '"':
                         self.error("unexpected '\"' after number", column=self.col_num+1)
+                        yield Tokens.Token(self, Tokens.Type.INVALID)
                         break
 
                     if token.value.endswith('.'):
@@ -195,10 +199,12 @@ class Scanner:
 
                     if next_char == '\n':
                         self.error("unexpected EOL while scanning string literal", column=self.col_num+1)
+                        yield Tokens.Token(self, Tokens.Type.INVALID)
                         break
 
                     if not next_char == '"':
                         self.error("illegal string character '%s'" % next_char, column=self.col_num+1)
+                        yield Tokens.Token(self, Tokens.Type.INVALID)
                         break
 
                     # consume the trailing quotation mark

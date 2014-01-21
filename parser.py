@@ -18,6 +18,10 @@ class Symbol:
     def __repr__(self):
         return "<%r, %r, %r>" % (self.name, self.type, self.addr)
 
+
+# scan error is raised when the parser encounters an invalid token
+class ScanError(Exception): pass
+
 class ParseError(Exception):
     def __init__(self, message, token=None):
         self.message = message
@@ -66,6 +70,8 @@ class Parser:
 
         while True:
             self.token = next(self.tokens)
+            if self.token.type == Tokens.Type.INVALID:
+                raise ScanError
             if self.token.type == Tokens.Type.COMMENT:
                 continue
             if self.token.value == '\n':
@@ -99,7 +105,7 @@ class Parser:
         Skips over a line in the token stream
         This is useful to try and recover from errors
         """
-        while self.token.value != '\n':
+        while self.token.value != '\n' and self.token.type != Tokens.Type.INVALID:
             self.token = next(self.tokens)
 
         # at this point the current token in '\n' so just skip to the next one
@@ -140,6 +146,9 @@ class Parser:
                 self.error(e.message, e.token)
                 self.skip_line()
                 continue
+            except ScanError:
+                self.skip_line()
+                continue
 
             if not self.match(Tokens.Type.SYMBOL, ';'):
                 self.error("expected ';' after declaration", token=self.prev_token)
@@ -158,6 +167,9 @@ class Parser:
                 self.statement()
             except ParseError as e:
                 self.error(e.message, e.token)
+                self.skip_line()
+                continue
+            except ScanError:
                 self.skip_line()
                 continue
 

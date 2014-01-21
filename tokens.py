@@ -41,6 +41,7 @@ class Tokens:
         SYMBOL      = "SYMBOL"
         COMMENT     = "COMMENT"
         SPECIAL     = "SPECIAL"
+        INVALID     = "INVALID"
 
     class Token(object):
 

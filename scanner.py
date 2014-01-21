@@ -33,6 +33,8 @@ class Scanner:
         if column is None:
             column = self.col_num
 
+        column -= len(self.line) - len(self.line.lstrip())
+
         print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (self.filename, self.line_num, column) + color + "%s: " % label + Color.WHITE + message
         print Color.DEFAULT + self.line.strip()
         print Color.GREEN + "%s^" % (' '*(column-1)) + Color.DEFAULT

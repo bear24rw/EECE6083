@@ -361,8 +361,8 @@ class Parser:
                      | true
                      | false
 
-        Returns a 2-tuple containing register
-        addr and type: (reg_addr, type)
+        Trys to find a valid factor and loads it into a register
+        Returns a tuple: (register_addr, type)
         """
 
         if self.match(Tokens.Type.SYMBOL, '('):

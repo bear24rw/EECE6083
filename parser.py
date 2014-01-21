@@ -19,36 +19,48 @@ class Symbol:
 class Parser:
 
     def __init__(self, scanner, gen):
+
+        self.has_errors = False
+        self.global_symbols = {}
+        self.matched_token = None
+        self.token = None
+
         self.gen = gen
         self.scanner = scanner
         self.tokens = scanner.token_iter()
         self.get_next_token()
 
-        self.global_symbols = {}
-        self.matched_token = None
+    def warning(self, message, token=None):
 
-    def warning(self, message):
+        self.print_message(message, label="warning", token=token, color=Color.YELLOW)
 
-        self.print_message(message, "warning", color=Color.YELLOW)
+    def error(self, message, token=None):
 
-    def error(self, message):
+        self.has_errors = True
+        self.print_message(message, label="error", token=token, color=Color.RED)
 
-        self.has_error = True
-        self.print_message(message, "error", color=Color.RED)
+    def print_message(self, message, label="info", token=None, color=Color.WHITE):
 
-    def print_message(self, message, label="info", color=Color.WHITE):
+        if token is None:
+            token = self.token
 
-        col_num = self.token.col_num
-        line_num = self.token.line_num
-        filename = self.token.filename
-        line_str = self.token.line_str
+        col_num = token.col_num
+        line_num = token.line_num
+        filename = token.filename
+        line_str = token.line_str
 
         print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (filename, line_num, col_num) + color + "%s: " % label + Color.WHITE + message
         print Color.DEFAULT + line_str
         print Color.GREEN + "%s^" % (' '*(col_num-1)) + Color.DEFAULT
 
     def get_next_token(self):
+        self.prev_token = self.token
         self.token = next(self.tokens)
+
+        # skip the special new line tokens
+        while self.token.value == '\n':
+            self.token = next(self.tokens)
+
         print "Current token: <%s,%r>" % (self.token.type, self.token.value)
 
     def match(self, type, value=None):
@@ -69,7 +81,18 @@ class Parser:
                 return value
         else:
             #self.error("Could not match token. Found <%s,%r> but expected <%s,%r>." % (self.token.type, self.token.value, type, value))
-            return None
+            return False
+
+    def skip_line(self):
+        """
+        Skips over a line in the token stream
+        This is useful to try and recover from errors
+        """
+        while self.token.value != '\n':
+            self.token = next(self.tokens)
+
+        # at this point the current token in '\n' so just skip to the next one
+        self.token = next(self.tokens)
 
     def program(self):
         """
@@ -94,61 +117,101 @@ class Parser:
                            end program
         """
 
-        while self.declaration():
-            self.match(Tokens.Type.SYMBOL, ";")
+        while True:
 
-        self.match(Tokens.Type.KEYWORD, "begin")
+            if self.match(Tokens.Type.KEYWORD, 'begin'):
+                break
 
-        while self.statement():
-            self.match(Tokens.Type.SYMBOL, ";")
+            # if its not a declaration just skip to the next line
+            if not self.declaration():
+                self.skip_line()
+                continue
 
-        self.match(Tokens.Type.KEYWORD, "end")
-        self.match(Tokens.Type.KEYWORD, "program")
+            if not self.match(Tokens.Type.SYMBOL, ';'):
+                self.error("expected ';' after declaration", token=self.prev_token)
+                continue
+
+            # don't use match() since it might iterate past end
+            if self.token.type == Tokens.Type.SPECIAL and self.token.value == 'EOF':
+                break
+
+        while True:
+
+            if self.match(Tokens.Type.KEYWORD, 'end'):
+                break
+
+            if not self.statement():
+                self.skip_line()
+                continue
+
+            if not self.match(Tokens.Type.SYMBOL, ";"):
+                self.error("expected ';' but found '%s'" % self.matched_token.value)
+                continue
+
+            # don't use match() since it might iterate past end
+            if self.token.type == Tokens.Type.SPECIAL and self.token.value == 'EOF':
+                break
+
+
+        if not self.match(Tokens.Type.KEYWORD, "program"):
+            self.error("expected 'program' but found '%s'" % self.token.value)
 
     def declaration(self):
         """
         <declaration> ::= [global] <procedure_declaration> |
                           [global] <variable_declaration>
         """
+
         if self.match(Tokens.Type.KEYWORD, 'global'):
-            isglobal = True
+            is_global = True
         else:
-            isglobal = False
+            is_global = False
 
-        symbol = self.variable_declaration()
-        if not symbol:
-            return None
+        is_var = self.variable_declaration(is_global)
+        is_pro = self.procedure_declaration(is_global)
 
-        if isglobal:
-
-            if symbol.name in self.global_symbols:
-                self.error("duplicate declaration")
-                return None
-
-            self.global_symbols[symbol.name] = symbol
+        if not is_var and not is_pro:
+            self.error("expected variable or procedure declaration")
+            return False
 
         return True
 
-    def variable_declaration(self):
+    def procedure_declaration(self, isglobal):
+        return False
+
+    def variable_declaration(self, isglobal):
         """
         <variable_declaration> ::= <type_mark><identifier>
                                    [[<array_size>]]
         """
+
         typemark = self.type_mark()
         if not typemark:
-            return None
+            return False
 
         name = self.match(Tokens.Type.IDENTIFIER)
-        return Symbol(name, typemark)
+        if not name:
+            self.error("expected identifier but found '%s'" % self.token.type)
+            return False
+
+        if isglobal:
+
+            if name in self.global_symbols:
+                self.error("duplicate declaration")
+                return False
+
+            self.global_symbols[name] = Symbol(name, typemark)
+
+        return True
 
     def type_mark(self):
         """
         <type_mark> ::= integer|float|bool|string
         """
-        if self.match(Tokens.Type.KEYWORD, 'integer'): return 'INTEGER'
-        if self.match(Tokens.Type.KEYWORD, 'float'): return 'FLOAT'
-        if self.match(Tokens.Type.KEYWORD, 'bool'): return 'BOOL'
-        if self.match(Tokens.Type.KEYWORD, 'string'): return 'STRING'
+        if self.match(Tokens.Type.KEYWORD, 'integer'): return Tokens.Type.INTEGER
+        if self.match(Tokens.Type.KEYWORD, 'float'): return Tokens.Type.FLOAT
+        if self.match(Tokens.Type.KEYWORD, 'bool'): return Tokens.Type.BOOL
+        if self.match(Tokens.Type.KEYWORD, 'string'): return Tokens.Type.STRING
         return None
 
     def statement(self):
@@ -357,6 +420,11 @@ if __name__ == "__main__":
     scanner = Scanner(sys.argv[1])
     parser = Parser(scanner, gen)
     parser.program()
+
+    if scanner.has_errors or parser.has_errors:
+        print "-"*50
+        print "BUILD FAILED"
+        sys.exit(1)
 
     print "Global Symbols"
     print "-"*50

@@ -17,7 +17,7 @@ class Scanner:
 
         self.line_num = 0
         self.col_num = 0
-        self.has_error = False
+        self.has_errors = False
 
     def warning(self, message, column=None):
 
@@ -25,7 +25,7 @@ class Scanner:
 
     def error(self, message, column=None):
 
-        self.has_error = True
+        self.has_errors = True
         self.print_message(message, "error", column, Color.RED)
 
     def print_message(self, message, label="info", column=None, color=Color.WHITE):
@@ -65,7 +65,12 @@ class Scanner:
             for char, next_char in col_iter:
 
                 # if we see a space just skip it and keep looking
-                if char in [' ', '\n', '\t']:
+                if char in [' ', '\t']:
+                    continue
+
+                # if its a newline insert a special token and then skip it
+                if char == '\n':
+                    yield Tokens.Token(self, Tokens.Type.SPECIAL, '\n')
                     continue
 
                 """
@@ -120,7 +125,9 @@ class Scanner:
                         self.error("unexpected '\"' after identifier", column=self.col_num+1)
                         break
 
-                    if token.value in Tokens.keywords:
+                    if token.value in ['true', 'false']:
+                        token.type = Tokens.Type.BOOL
+                    elif token.value in Tokens.keywords:
                         token.type = Tokens.Type.KEYWORD
                     else:
                         token.type = Tokens.Type.IDENTIFIER
@@ -208,4 +215,4 @@ if __name__ == "__main__":
     import sys
     scanner = Scanner(sys.argv[1])
     for token in scanner.token_iter():
-        print token
+        if token.value != '\n': print token

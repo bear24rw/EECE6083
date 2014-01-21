@@ -37,6 +37,7 @@ class Tokens:
         INTEGER     = "INTEGER"
         FLOAT       = "FLOAT"
         STRING      = "STRING"
+        BOOL        = "BOOL"
         SYMBOL      = "SYMBOL"
         COMMENT     = "COMMENT"
         SPECIAL     = "SPECIAL"

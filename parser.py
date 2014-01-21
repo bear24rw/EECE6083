@@ -230,8 +230,8 @@ class Parser:
         <assignment_statement> ::= <destination> := <expression>
         """
 
-        destination = self.destination()
-        if not destination:
+        dest_addr, dest_type = self.destination()
+        if dest_addr is None:
             return False
 
         if not self.match(Tokens.Type.SYMBOL, ':='):
@@ -242,7 +242,11 @@ class Parser:
         if exp_addr is None:
             return False
 
-        self.gen.write("M[%d] = R[%d]" % (destination.addr, exp_addr))
+        if dest_type != exp_type:
+            self.error("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type))
+            return False
+
+        self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
 
         return True
 
@@ -258,13 +262,13 @@ class Parser:
 
         name = self.match(Tokens.Type.IDENTIFIER)
         if not name:
-            return None
+            return (None, None)
 
         if not name in self.global_symbols:
             self.error("destination identifier undefined")
-            return None
+            return (None, None)
 
-        return self.global_symbols[name]
+        return (name, self.global_symbols[name].type)
 
     def expression(self):
         """

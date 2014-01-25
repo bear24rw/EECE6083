@@ -37,4 +37,3 @@ class Gen:
 
     def goto_label(self, label):
         self.lines.append("goto %s" % label)
-

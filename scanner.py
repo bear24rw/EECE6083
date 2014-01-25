@@ -59,6 +59,7 @@ class Scanner:
 
         for line in self.f:
 
+            line = line.lower()
             self.line = line
             self.line_num += 1
 

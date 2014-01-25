@@ -8,6 +8,7 @@ class Gen:
         self.memory = []
         self.current_reg = 0
         self.current_mem = 0
+        self.current_label = 0
 
     def set_new_reg(self, string):
 
@@ -26,4 +27,14 @@ class Gen:
     def write(self, string):
         self.lines.append(string)
 
+    def put_label(self, name):
+        self.lines.append("%s:" % name)
+
+    def new_label(self):
+        i = self.current_label
+        self.current_label += 1
+        return "label_%d" % i
+
+    def goto_label(self, label):
+        self.lines.append("goto %s" % label)
 

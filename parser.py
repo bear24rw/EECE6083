@@ -78,7 +78,7 @@ class Parser:
                 continue
             break
 
-        #print "Current token: <%s,%r>" % (self.token.type, self.token.value)
+        print "Current token: <%s,%r>" % (self.token.type, self.token.value)
 
     def match(self, type, value=None):
         #print "Trying to match <%s> with <%s>" % (type, self.token.type)
@@ -158,7 +158,7 @@ class Parser:
             if self.token.type == Tokens.Type.SPECIAL and self.token.value == 'EOF':
                 break
 
-        while True:
+        while self.token.value != 'EOF':
 
             if self.match(Tokens.Type.KEYWORD, 'end'):
                 break
@@ -174,7 +174,7 @@ class Parser:
                 continue
 
             if not self.match(Tokens.Type.SYMBOL, ";"):
-                self.error("expected ';' after statement ", token=self.prev_token)
+                self.error("[body] expected ';' after statement ", token=self.prev_token)
                 continue
 
             # don't use match() since it might iterate past end
@@ -244,9 +244,9 @@ class Parser:
                         | <if_statement>
                         | <loop_statement>
         """
-        if self.assignment_statement(): return True
-        if self.if_statement():         return True
-        if self.loop_statement():       return True
+        if self.if_statement():         return 'if'
+        if self.loop_statement():       return 'loop'
+        if self.assignment_statement(): return 'assignment'
         return None
 
     def assignment_statement(self):
@@ -255,11 +255,15 @@ class Parser:
         """
 
         dest_name, dest_addr, dest_type = self.destination()
-        if dest_addr is None:
-            return False
 
+        # if the next token is not an assignment operator we are
+        # not doing an assignment so just return
         if not self.match(Tokens.Type.SYMBOL, ':='):
             return False
+
+        # we are doing an assignment but the destination was invalid
+        if dest_addr is None:
+            raise ParseError("destination identifier undefined", self.prev_token)
 
         self.global_symbols[dest_name].used = True
 
@@ -276,7 +280,88 @@ class Parser:
         return True
 
     def if_statement(self):
-        return False
+        """
+        <if_statement> ::= if(<expression>)then
+                            (<statement>;)+
+                            [else(<statement>;)+]
+                            end if
+        """
+
+        # if the first keyword isn't an if dont even try to continue
+        if not self.match(Tokens.Type.KEYWORD, 'if'):
+            return False
+
+        if not self.match(Tokens.Type.SYMBOL, '('):
+            self.error("expected '(' after 'if'")
+
+        # generate two labels to use for jumping to the
+        # else block and the end of the if block
+        else_label = self.gen.new_label()
+        end_label = self.gen.new_label()
+
+        # parsing the expression can raise an exception so we need to catch it
+        # if there is an exception just skip the line and continue to the body
+        # of the if statement
+        try:
+
+            exp_addr, exp_type = self.expression()
+
+            if exp_type != Tokens.Type.BOOL:
+                raise ParseError("expression must evaluate to type boolean")
+
+            if not self.match(Tokens.Type.SYMBOL, ')'):
+                raise ParseError("expected ')' after expression")
+
+            if not self.match(Tokens.Type.KEYWORD, 'then'):
+                raise ParseError("expected 'then'")
+
+            # if the branch is not taken jump to the else
+            self.gen.write("if(R[%d] == 0) { goto %s; }" % (exp_addr, else_label))
+
+        except ParseError as e:
+            self.error(e.message, e.token)
+            self.skip_line()
+        except ScanError:
+            self.skip_line()
+
+        # if this if block has no else we need to place the else
+        # label at the end of the block (with the end label)
+        has_else = False
+
+        while True:
+
+            if self.match(Tokens.Type.KEYWORD, 'else'):
+                has_else = True
+                self.gen.goto_label(end_label)
+                self.gen.put_label(else_label)
+
+            if self.match(Tokens.Type.KEYWORD, 'end'):
+                break
+
+            try:
+                if not self.statement():
+                    raise ParseError("invalid statement")
+            except ParseError as e:
+                self.error(e.message, e.token)
+                self.skip_line()
+                continue
+            except ScanError:
+                self.skip_line()
+                continue
+
+            if not self.match(Tokens.Type.SYMBOL, ';'):
+                self.error("expected ';' following statement", self.prev_token)
+
+        if not self.match(Tokens.Type.KEYWORD, 'if'):
+            raise ParseError("expected 'if'")
+
+        if not has_else:
+            self.gen.put_label(else_label)
+
+        self.gen.put_label(end_label)
+
+        return True
+
     def loop_statement(self):
         return False
 
@@ -288,7 +373,7 @@ class Parser:
         name = self.match(Tokens.Type.IDENTIFIER)
 
         if not name in self.global_symbols:
-            raise ParseError("destination identifier undefined", self.prev_token)
+            return (name, None, None)
 
         return (name, self.global_symbols[name].addr, self.global_symbols[name].type)
 

@@ -287,7 +287,7 @@ class Parser:
                             end if
         """
 
-        # if the first keyword isn't an if dont even try to continue
+        # if the first keyword isn't 'if' dont even try to continue
         if not self.match(Tokens.Type.KEYWORD, 'if'):
             return False
 
@@ -363,7 +363,74 @@ class Parser:
         return True
 
     def loop_statement(self):
-        return False
+        """
+        <loop_statement> ::= for(<assignment_statement>; <expression>)
+                             (<statement>;)*
+                             end for
+        """
+
+        # if the first keyword isn't 'for' dont even try to continue
+        if not self.match(Tokens.Type.KEYWORD, 'for'):
+            return False
+
+        if not self.match(Tokens.Type.SYMBOL, '('):
+            self.error("expected '(' after 'for'")
+
+        loop_label = self.gen.new_label()
+        end_label = self.gen.new_label()
+
+        self.gen.put_label(loop_label)
+
+        try:
+
+            if not self.assignment_statement():
+                raise ParseError("expected assignment statement")
+
+            if not self.match(Tokens.Type.SYMBOL, ';'):
+                raise ParseError("expected ';' following statement", self.prev_token)
+
+            exp_addr, _ = self.expression()
+            if exp_addr is None:
+                raise ParseError("invalid expression")
+
+            if not self.match(Tokens.Type.SYMBOL, ')'):
+                raise ParseError("expected closing ')'", self.prev_token)
+
+            self.gen.write("if (R[%d] == 0) { goto %s; }" % (exp_addr, end_label))
+
+        except ParseError as e:
+            self.error(e.message, e.token)
+            self.skip_line()
+        except ScanError:
+            self.skip_line()
+
+        while True:
+
+            if self.match(Tokens.Type.KEYWORD, 'end'):
+                break
+
+            try:
+                if not self.statement():
+                    raise ParseError("invalid statement")
+            except ParseError as e:
+                self.error(e.message, e.token)
+                self.skip_line()
+                continue
+            except ScanError:
+                self.skip_line()
+                continue
+
+            if not self.match(Tokens.Type.SYMBOL, ';'):
+                self.error("expected ';' following statement", self.prev_token)
+
+
+        if not self.match(Tokens.Type.KEYWORD, 'for'):
+            raise ParseError("expected 'for'")
+
+        self.gen.goto_label(loop_label)
+        self.gen.put_label(end_label)
+
+        return True
 
     def destination(self):
         """

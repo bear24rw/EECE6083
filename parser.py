@@ -107,7 +107,7 @@ class Parser:
         Skips over a line in the token stream
         This is useful to try and recover from errors
         """
-        while self.token.value == '\n' or self.token.type == Tokens.INVALID or self.token.type == Tokens.COMMENT:
+        while self.token.value != '\n' and self.token.type != Tokens.INVALID and self.token.type != Tokens.COMMENT:
             self.token = next(self.tokens)
 
         # at this point the current token in '\n' so just skip to the next one
@@ -389,6 +389,7 @@ class Parser:
         except ScanError:
             self.skip_line()
 
+        # consume the body of the loop
         self.statements()
 
         if not self.match(Tokens.KEYWORD, 'for'):

@@ -62,7 +62,7 @@ class Parser:
 
         print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (filename, line_num, col_num) + color + "%s: " % label + Color.WHITE + message
         print Color.DEFAULT + line_str
-        print Color.GREEN + "%s^" % (' '*(col_num-1)) + Color.DEFAULT
+        print Color.GREEN + "%s^%s" % (' '*(col_num-1), '~'*(len(token.value)-1)) + Color.DEFAULT
 
     def get_next_token(self):
 

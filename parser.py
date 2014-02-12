@@ -81,24 +81,26 @@ class Parser:
         print "Current token: <%s,%r>" % (self.token.type, self.token.value)
 
     def match(self, type, value=None):
-        #print "Trying to match <%s> with <%s>" % (type, self.token.type)
-        if self.token.type == type:
-            #print "Match successful"
-            if value:
-                if self.token.value == value:
-                    self.matched_token = self.token
-                    self.get_next_token()
-                    return True
-                else:
-                    return False
-            else:
-                value = self.token.value
-                self.matched_token = self.token
-                self.get_next_token()
-                return value
-        else:
+
+        # If this isn't even the right type of token just return
+        if self.token.type != type:
             #self.error("Could not match token. Found <%s,%r> but expected <%s,%r>." % (self.token.type, self.token.value, type, value))
             return False
+
+        # If we're only looking for a certain type just return the value
+        if value is None:
+            value = self.token.value
+            self.matched_token = self.token
+            self.get_next_token()
+            return value
+
+        # If we're looking for a certain value as well then return if we matched it
+        if self.token.value == value:
+            self.matched_token = self.token
+            self.get_next_token()
+            return True
+
+        return False
 
     def skip_line(self):
         """

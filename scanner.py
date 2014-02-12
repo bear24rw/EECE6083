@@ -73,7 +73,7 @@ class Scanner:
 
                 # if its a newline insert a special token and then skip it
                 if char == '\n':
-                    yield Tokens.Token(self, Tokens.Type.SPECIAL, '\n')
+                    yield Tokens.Token(self, Tokens.SPECIAL, '\n')
                     continue
 
                 """
@@ -82,7 +82,7 @@ class Scanner:
                 if char == "/" and next_char == "/":
 
                     token = Tokens.Token(self)
-                    token.type = Tokens.Type.COMMENT
+                    token.type = Tokens.COMMENT
 
                     # consume until end of the line
                     while next_char:
@@ -100,7 +100,7 @@ class Scanner:
                 if any(x.startswith(char) for x in Tokens.symbols):
 
                     token = Tokens.Token(self)
-                    token.type = Tokens.Type.SYMBOL
+                    token.type = Tokens.SYMBOL
                     token.value = char
 
                     while any(x.startswith(token.value+next_char) for x in Tokens.symbols):
@@ -126,15 +126,15 @@ class Scanner:
 
                     if next_char == '"':
                         self.error("unexpected '\"' after identifier", column=self.col_num+1)
-                        yield Tokens.Token(self, Tokens.Type.INVALID)
+                        yield Tokens.Token(self, Tokens.INVALID)
                         break
 
                     if token.value in ['true', 'false']:
-                        token.type = Tokens.Type.BOOL
+                        token.type = Tokens.BOOL
                     elif token.value in Tokens.keywords:
-                        token.type = Tokens.Type.KEYWORD
+                        token.type = Tokens.KEYWORD
                     else:
-                        token.type = Tokens.Type.IDENTIFIER
+                        token.type = Tokens.IDENTIFIER
 
                     yield token
 
@@ -147,7 +147,7 @@ class Scanner:
                 if char.isdigit() or char == '.':
 
                     token = Tokens.Token(self)
-                    token.type = Tokens.Type.INTEGER
+                    token.type = Tokens.INTEGER
                     token.value += char
 
                     if char == '.':
@@ -161,17 +161,17 @@ class Scanner:
 
                     if token.value.count('.') == 2:
                         self.error("too many decimals", column=self.col_num+1)
-                        yield Tokens.Token(self, Tokens.Type.INVALID)
+                        yield Tokens.Token(self, Tokens.INVALID)
                         break
 
                     if next_char.isalpha():
                         self.error("expected number but found '%s'" % next_char, column=self.col_num+1)
-                        yield Tokens.Token(self, Tokens.Type.INVALID)
+                        yield Tokens.Token(self, Tokens.INVALID)
                         break
 
                     if next_char == '"':
                         self.error("unexpected '\"' after number", column=self.col_num+1)
-                        yield Tokens.Token(self, Tokens.Type.INVALID)
+                        yield Tokens.Token(self, Tokens.INVALID)
                         break
 
                     if token.value.endswith('.'):
@@ -179,7 +179,7 @@ class Scanner:
                         token.value += '0'
 
                     if '.' in token.value:
-                        token.type = Tokens.Type.FLOAT
+                        token.type = Tokens.FLOAT
 
                     yield token
 
@@ -192,7 +192,7 @@ class Scanner:
                 if char == '"':
 
                     token = Tokens.Token(self)
-                    token.type = Tokens.Type.STRING
+                    token.type = Tokens.STRING
 
                     while next_char.isalnum() or next_char in " _,;:.'":
                         token.value += next_char
@@ -200,12 +200,12 @@ class Scanner:
 
                     if next_char == '\n':
                         self.error("unexpected EOL while scanning string literal", column=self.col_num+1)
-                        yield Tokens.Token(self, Tokens.Type.INVALID)
+                        yield Tokens.Token(self, Tokens.INVALID)
                         break
 
                     if not next_char == '"':
                         self.error("illegal string character '%s'" % next_char, column=self.col_num+1)
-                        yield Tokens.Token(self, Tokens.Type.INVALID)
+                        yield Tokens.Token(self, Tokens.INVALID)
                         break
 
                     # consume the trailing quotation mark
@@ -218,7 +218,7 @@ class Scanner:
                 self.error("unsupported character '%s'" % char)
 
         # return an EOF token since we are done
-        yield Tokens.Token(self, Tokens.Type.SPECIAL, 'EOF')
+        yield Tokens.Token(self, Tokens.SPECIAL, 'EOF')
 
 if __name__ == "__main__":
     import sys

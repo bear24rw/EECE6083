@@ -70,9 +70,9 @@ class Parser:
 
         while True:
             self.token = next(self.tokens)
-            if self.token.type == Tokens.Type.INVALID:
+            if self.token.type == Tokens.INVALID:
                 raise ScanError
-            if self.token.type == Tokens.Type.COMMENT:
+            if self.token.type == Tokens.COMMENT:
                 continue
             if self.token.value == '\n':
                 continue
@@ -107,7 +107,7 @@ class Parser:
         Skips over a line in the token stream
         This is useful to try and recover from errors
         """
-        while self.token.value != '\n' and self.token.type != Tokens.Type.INVALID:
+        while self.token.value != '\n' and self.token.type != Tokens.INVALID:
             self.token = next(self.tokens)
 
         # at this point the current token in '\n' so just skip to the next one
@@ -125,9 +125,9 @@ class Parser:
         """
         <program_header> ::= program <identifier> is
         """
-        self.match(Tokens.Type.KEYWORD, "program")
-        name = self.match(Tokens.Type.IDENTIFIER)
-        self.match(Tokens.Type.KEYWORD, "is")
+        self.match(Tokens.KEYWORD, "program")
+        name = self.match(Tokens.IDENTIFIER)
+        self.match(Tokens.KEYWORD, "is")
 
     def program_body(self):
         """
@@ -139,7 +139,7 @@ class Parser:
 
         while True:
 
-            if self.match(Tokens.Type.KEYWORD, 'begin'):
+            if self.match(Tokens.KEYWORD, 'begin'):
                 break
 
             try:
@@ -152,17 +152,17 @@ class Parser:
                 self.skip_line()
                 continue
 
-            if not self.match(Tokens.Type.SYMBOL, ';'):
+            if not self.match(Tokens.SYMBOL, ';'):
                 self.error("expected ';' after declaration", token=self.prev_token)
                 continue
 
             # don't use match() since it might iterate past end
-            if self.token.type == Tokens.Type.SPECIAL and self.token.value == 'EOF':
+            if self.token.type == Tokens.SPECIAL and self.token.value == 'EOF':
                 break
 
         while self.token.value != 'EOF':
 
-            if self.match(Tokens.Type.KEYWORD, 'end'):
+            if self.match(Tokens.KEYWORD, 'end'):
                 break
 
             try:
@@ -175,16 +175,16 @@ class Parser:
                 self.skip_line()
                 continue
 
-            if not self.match(Tokens.Type.SYMBOL, ";"):
+            if not self.match(Tokens.SYMBOL, ";"):
                 self.error("[body] expected ';' after statement ", token=self.prev_token)
                 continue
 
             # don't use match() since it might iterate past end
-            if self.token.type == Tokens.Type.SPECIAL and self.token.value == 'EOF':
+            if self.token.type == Tokens.SPECIAL and self.token.value == 'EOF':
                 break
 
 
-        if not self.match(Tokens.Type.KEYWORD, "program"):
+        if not self.match(Tokens.KEYWORD, "program"):
             self.error("expected 'program' but found '%s'" % self.token.value)
 
     def declaration(self):
@@ -193,7 +193,7 @@ class Parser:
                           [global] <variable_declaration>
         """
 
-        if self.match(Tokens.Type.KEYWORD, 'global'):
+        if self.match(Tokens.KEYWORD, 'global'):
             is_global = True
         else:
             is_global = False
@@ -217,7 +217,7 @@ class Parser:
         if not typemark:
             return False
 
-        name = self.match(Tokens.Type.IDENTIFIER)
+        name = self.match(Tokens.IDENTIFIER)
         if not name:
             raise ParseError("expected identifier but found '%s'" % self.token.type)
 
@@ -234,10 +234,10 @@ class Parser:
         """
         <type_mark> ::= integer|float|bool|string
         """
-        if self.match(Tokens.Type.KEYWORD, 'integer'): return Tokens.Type.INTEGER
-        if self.match(Tokens.Type.KEYWORD, 'float'): return Tokens.Type.FLOAT
-        if self.match(Tokens.Type.KEYWORD, 'bool'): return Tokens.Type.BOOL
-        if self.match(Tokens.Type.KEYWORD, 'string'): return Tokens.Type.STRING
+        if self.match(Tokens.KEYWORD, 'integer'): return Tokens.INTEGER
+        if self.match(Tokens.KEYWORD, 'float'): return Tokens.FLOAT
+        if self.match(Tokens.KEYWORD, 'bool'): return Tokens.BOOL
+        if self.match(Tokens.KEYWORD, 'string'): return Tokens.STRING
         return None
 
     def statement(self):
@@ -260,7 +260,7 @@ class Parser:
 
         # if the next token is not an assignment operator we are
         # not doing an assignment so just return
-        if not self.match(Tokens.Type.SYMBOL, ':='):
+        if not self.match(Tokens.SYMBOL, ':='):
             return False
 
         # we are doing an assignment but the destination was invalid
@@ -290,10 +290,10 @@ class Parser:
         """
 
         # if the first keyword isn't 'if' dont even try to continue
-        if not self.match(Tokens.Type.KEYWORD, 'if'):
+        if not self.match(Tokens.KEYWORD, 'if'):
             return False
 
-        if not self.match(Tokens.Type.SYMBOL, '('):
+        if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '(' after 'if'")
 
         # generate two labels to use for jumping to the
@@ -308,13 +308,13 @@ class Parser:
 
             exp_addr, exp_type = self.expression()
 
-            if exp_type != Tokens.Type.BOOL:
+            if exp_type != Tokens.BOOL:
                 raise ParseError("expression must evaluate to type boolean")
 
-            if not self.match(Tokens.Type.SYMBOL, ')'):
+            if not self.match(Tokens.SYMBOL, ')'):
                 raise ParseError("expected ')' after expression")
 
-            if not self.match(Tokens.Type.KEYWORD, 'then'):
+            if not self.match(Tokens.KEYWORD, 'then'):
                 raise ParseError("expected 'then'")
 
             # if the branch is not taken jump to the else
@@ -332,12 +332,12 @@ class Parser:
 
         while True:
 
-            if self.match(Tokens.Type.KEYWORD, 'else'):
+            if self.match(Tokens.KEYWORD, 'else'):
                 has_else = True
                 self.gen.goto_label(end_label)
                 self.gen.put_label(else_label)
 
-            if self.match(Tokens.Type.KEYWORD, 'end'):
+            if self.match(Tokens.KEYWORD, 'end'):
                 break
 
             try:
@@ -351,10 +351,10 @@ class Parser:
                 self.skip_line()
                 continue
 
-            if not self.match(Tokens.Type.SYMBOL, ';'):
+            if not self.match(Tokens.SYMBOL, ';'):
                 self.error("expected ';' following statement", self.prev_token)
 
-        if not self.match(Tokens.Type.KEYWORD, 'if'):
+        if not self.match(Tokens.KEYWORD, 'if'):
             raise ParseError("expected 'if'")
 
         if not has_else:
@@ -372,10 +372,10 @@ class Parser:
         """
 
         # if the first keyword isn't 'for' dont even try to continue
-        if not self.match(Tokens.Type.KEYWORD, 'for'):
+        if not self.match(Tokens.KEYWORD, 'for'):
             return False
 
-        if not self.match(Tokens.Type.SYMBOL, '('):
+        if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '(' after 'for'")
 
         loop_label = self.gen.new_label()
@@ -388,14 +388,14 @@ class Parser:
             if not self.assignment_statement():
                 raise ParseError("expected assignment statement")
 
-            if not self.match(Tokens.Type.SYMBOL, ';'):
+            if not self.match(Tokens.SYMBOL, ';'):
                 raise ParseError("expected ';' following statement", self.prev_token)
 
             exp_addr, _ = self.expression()
             if exp_addr is None:
                 raise ParseError("invalid expression")
 
-            if not self.match(Tokens.Type.SYMBOL, ')'):
+            if not self.match(Tokens.SYMBOL, ')'):
                 raise ParseError("expected closing ')'", self.prev_token)
 
             self.gen.write("if (R[%d] == 0) { goto %s; }" % (exp_addr, end_label))
@@ -408,7 +408,7 @@ class Parser:
 
         while True:
 
-            if self.match(Tokens.Type.KEYWORD, 'end'):
+            if self.match(Tokens.KEYWORD, 'end'):
                 break
 
             try:
@@ -422,11 +422,11 @@ class Parser:
                 self.skip_line()
                 continue
 
-            if not self.match(Tokens.Type.SYMBOL, ';'):
+            if not self.match(Tokens.SYMBOL, ';'):
                 self.error("expected ';' following statement", self.prev_token)
 
 
-        if not self.match(Tokens.Type.KEYWORD, 'for'):
+        if not self.match(Tokens.KEYWORD, 'for'):
             raise ParseError("expected 'for'")
 
         self.gen.goto_label(loop_label)
@@ -439,7 +439,7 @@ class Parser:
         <destination> ::= <identifier>[[<expression>]]
         """
 
-        name = self.match(Tokens.Type.IDENTIFIER)
+        name = self.match(Tokens.IDENTIFIER)
 
         if not name in self.global_symbols:
             return (name, None, None)
@@ -457,14 +457,14 @@ class Parser:
 
         lhs_addr, lhs_type = lhs
 
-        while any([self.match(Tokens.Type.SYMBOL, op) for op in operations]):
+        while any([self.match(Tokens.SYMBOL, op) for op in operations]):
             operation = self.matched_token.value
             rhs_addr, rhs_type = rhs()
             if lhs_type != rhs_type:
                 raise ParseError("expression type error. '%s' and '%s' incompatible." % (lhs_type, rhs_type))
             lhs_addr = self.gen.set_new_reg("R[%d] %s R[%d]" % (lhs_addr, operation, rhs_addr))
             if result_is_bool:
-                lhs_type = Tokens.Type.BOOL
+                lhs_type = Tokens.BOOL
 
         return (lhs_addr, lhs_type)
 
@@ -475,7 +475,7 @@ class Parser:
                          | [not] <arith_op>
         """
 
-        hasnot =  self.match(Tokens.Type.KEYWORD, 'not')
+        hasnot =  self.match(Tokens.KEYWORD, 'not')
 
         addr, type = self.arith_op()
 
@@ -532,13 +532,13 @@ class Parser:
         Returns a tuple: (register_addr, type)
         """
 
-        if self.match(Tokens.Type.SYMBOL, '('):
+        if self.match(Tokens.SYMBOL, '('):
             addr, type = self.expression()
-            if not self.match(Tokens.Type.SYMBOL, ')'):
+            if not self.match(Tokens.SYMBOL, ')'):
                 raise ParseError("expected ')'")
             return (addr, type)
 
-        if self.match(Tokens.Type.SYMBOL, '-'):
+        if self.match(Tokens.SYMBOL, '-'):
             negate = True
         else:
             negate = False
@@ -546,7 +546,7 @@ class Parser:
         """
         Identifiers
         """
-        if self.match(Tokens.Type.IDENTIFIER):
+        if self.match(Tokens.IDENTIFIER):
 
             name = self.matched_token.value
 
@@ -566,7 +566,7 @@ class Parser:
         """
         Numbers
         """
-        if self.match(Tokens.Type.INTEGER) or self.match(Tokens.Type.FLOAT):
+        if self.match(Tokens.INTEGER) or self.match(Tokens.FLOAT):
             addr = self.gen.set_new_reg(self.matched_token.value)
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
@@ -575,18 +575,18 @@ class Parser:
         """
         String
         """
-        if self.match(Tokens.Type.STRING): return self.matched_token
+        if self.match(Tokens.STRING): return self.matched_token
 
         """
         Bool
         """
-        if self.match(Tokens.Type.BOOL):
+        if self.match(Tokens.BOOL):
             value = self.matched_token.value
             if value == 'true':
                 addr = self.gen.set_new_reg("1")
             else:
                 addr = self.gen.set_new_reg("0")
-            return (addr, Tokens.Type.BOOL)
+            return (addr, Tokens.BOOL)
 
         raise ParseError("expected factor but found '%s'" % self.token.value)
 

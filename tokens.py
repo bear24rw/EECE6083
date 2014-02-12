@@ -31,17 +31,17 @@ class Tokens:
         'end',
     ]
 
-    class Type():
-        KEYWORD     = "KEYWORD"
-        IDENTIFIER  = "IDENTIFIER"
-        INTEGER     = "INTEGER"
-        FLOAT       = "FLOAT"
-        STRING      = "STRING"
-        BOOL        = "BOOL"
-        SYMBOL      = "SYMBOL"
-        COMMENT     = "COMMENT"
-        SPECIAL     = "SPECIAL"
-        INVALID     = "INVALID"
+    # Token Types
+    KEYWORD     = "KEYWORD"
+    IDENTIFIER  = "IDENTIFIER"
+    INTEGER     = "INTEGER"
+    FLOAT       = "FLOAT"
+    STRING      = "STRING"
+    BOOL        = "BOOL"
+    SYMBOL      = "SYMBOL"
+    COMMENT     = "COMMENT"
+    SPECIAL     = "SPECIAL"
+    INVALID     = "INVALID"
 
     class Token(object):
 
@@ -56,7 +56,6 @@ class Tokens:
 
             # recalculate token column number ignoring beginning whitespace
             self.col_num -= len(scanner.line) - len(scanner.line.lstrip())
-
 
         def __repr__(self):
             return "<%s,%s>" % (self.type, self.value)

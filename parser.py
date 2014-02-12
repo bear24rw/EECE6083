@@ -107,7 +107,7 @@ class Parser:
         Skips over a line in the token stream
         This is useful to try and recover from errors
         """
-        while self.token.value != '\n' and self.token.type != Tokens.INVALID:
+        while self.token.value == '\n' or self.token.type == Tokens.INVALID or self.token.type == Tokens.COMMENT:
             self.token = next(self.tokens)
 
         # at this point the current token in '\n' so just skip to the next one
@@ -160,29 +160,7 @@ class Parser:
             if self.token.type == Tokens.SPECIAL and self.token.value == 'EOF':
                 break
 
-        while self.token.value != 'EOF':
-
-            if self.match(Tokens.KEYWORD, 'end'):
-                break
-
-            try:
-                self.statement()
-            except ParseError as e:
-                self.error(e.message, e.token)
-                self.skip_line()
-                continue
-            except ScanError:
-                self.skip_line()
-                continue
-
-            if not self.match(Tokens.SYMBOL, ";"):
-                self.error("[body] expected ';' after statement ", token=self.prev_token)
-                continue
-
-            # don't use match() since it might iterate past end
-            if self.token.type == Tokens.SPECIAL and self.token.value == 'EOF':
-                break
-
+        self.statements()
 
         if not self.match(Tokens.KEYWORD, "program"):
             self.error("expected 'program' but found '%s'" % self.token.value)
@@ -249,7 +227,33 @@ class Parser:
         if self.if_statement():         return 'if'
         if self.loop_statement():       return 'loop'
         if self.assignment_statement(): return 'assignment'
+        raise ParseError("invalid statement")
         return None
+
+    def statements(self):
+        """
+        Helper function to process multiple lines of statements
+        """
+
+        while self.token.value not in ('EOF', 'else', 'end'):
+
+            try:
+                self.statement()
+            except ParseError as e:
+                self.error(e.message, e.token)
+                self.skip_line()
+                continue
+            except ScanError:
+                self.skip_line()
+                continue
+
+            if not self.match(Tokens.SYMBOL, ";"):
+                self.error("expected ';' after statement ", token=self.prev_token)
+                continue
+
+        # consume the 'end' token if there is one
+        self.match(Tokens.KEYWORD, 'end')
+
 
     def assignment_statement(self):
         """
@@ -326,41 +330,20 @@ class Parser:
         except ScanError:
             self.skip_line()
 
-        # if this if block has no else we need to place the else
-        # label at the end of the block (with the end label)
-        has_else = False
+        # process the body of the if block
+        self.statements()
 
-        while True:
+        self.gen.goto_label(end_label)
+        self.gen.put_label(else_label)
 
-            if self.match(Tokens.KEYWORD, 'else'):
-                has_else = True
-                self.gen.goto_label(end_label)
-                self.gen.put_label(else_label)
+        # if there is an else block process that too
+        if self.match(Tokens.KEYWORD, 'else'):
+            self.statements()
 
-            if self.match(Tokens.KEYWORD, 'end'):
-                break
-
-            try:
-                if not self.statement():
-                    raise ParseError("invalid statement")
-            except ParseError as e:
-                self.error(e.message, e.token)
-                self.skip_line()
-                continue
-            except ScanError:
-                self.skip_line()
-                continue
-
-            if not self.match(Tokens.SYMBOL, ';'):
-                self.error("expected ';' following statement", self.prev_token)
+        self.gen.put_label(end_label)
 
         if not self.match(Tokens.KEYWORD, 'if'):
             raise ParseError("expected 'if'")
-
-        if not has_else:
-            self.gen.put_label(else_label)
-
-        self.gen.put_label(end_label)
 
         return True
 
@@ -406,25 +389,7 @@ class Parser:
         except ScanError:
             self.skip_line()
 
-        while True:
-
-            if self.match(Tokens.KEYWORD, 'end'):
-                break
-
-            try:
-                if not self.statement():
-                    raise ParseError("invalid statement")
-            except ParseError as e:
-                self.error(e.message, e.token)
-                self.skip_line()
-                continue
-            except ScanError:
-                self.skip_line()
-                continue
-
-            if not self.match(Tokens.SYMBOL, ';'):
-                self.error("expected ';' following statement", self.prev_token)
-
+        self.statements()
 
         if not self.match(Tokens.KEYWORD, 'for'):
             raise ParseError("expected 'for'")

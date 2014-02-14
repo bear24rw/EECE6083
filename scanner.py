@@ -217,6 +217,7 @@ class Scanner:
                     continue
 
                 self.error("unsupported character '%s'" % char)
+                yield Tokens.Token(self, Tokens.INVALID)
 
         # return an EOF token since we are done
         yield Tokens.Token(self, Tokens.SPECIAL, 'EOF')

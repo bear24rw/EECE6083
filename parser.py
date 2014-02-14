@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+from contextlib import contextmanager
 from tokens import Tokens
 from color import Color
 
@@ -23,9 +24,10 @@ class Symbol:
 class ScanError(Exception): pass
 
 class ParseError(Exception):
-    def __init__(self, message, token=None):
+    def __init__(self, message, token=None, after_token=False):
         self.message = message
         self.token = token
+        self.after_token = after_token
 
 class Parser:
 
@@ -133,6 +135,18 @@ class Parser:
         """
         self.skip_until('\n', consume=True)
 
+    @contextmanager
+    def resync(self, find=None, consume=False, at_next_token=False):
+        try:
+            yield
+        except ParseError as e:
+            self.error(e.message, e.token, e.after_token)
+            if at_next_token: self.get_next_token()
+            if find: self.skip_until(find, consume)
+        except ScanError as e:
+            if at_next_token: self.get_next_token()
+            if find: self.skip_until(find, consume)
+
     def program(self):
         """
         <program> ::= <program_header><program_body>
@@ -178,10 +192,10 @@ class Parser:
             is_global = False
 
         if self.procedure_declaration(is_global):
-            return True
+            return
 
-        if self.variable_declaration(is_global)
-            return True
+        if self.variable_declaration(is_global):
+            return
 
         raise ParseError("expected variable or procedure declaration")
 
@@ -192,15 +206,8 @@ class Parser:
 
         while self.token.value not in ('EOF', 'begin'):
 
-            try:
+            with self.resync('\n'):
                 self.declaration()
-            except ParseError as e:
-                self.error(e.message, e.token)
-                self.skip_line()
-                continue
-            except ScanError:
-                self.skip_line()
-                continue
 
             if not self.match(Tokens.SYMBOL, ';'):
                 self.error("expected ';' after declaration", self.prev_token, after_token=True)
@@ -252,7 +259,7 @@ class Parser:
         self.parameter_list()
 
         if not self.match(Tokens.SYMBOL, ')'):
-            self.error("expected ')'", self.prev_token, after_token=True)
+            self.error("expected ')' or ','", self.prev_token, after_token=True)
             self.skip_line()
 
         return True
@@ -263,7 +270,9 @@ class Parser:
                              <parameter>
         """
 
-        p = self.parameter()
+        with self.resync((',',')')):
+            self.parameter()
+
         if self.match(Tokens.SYMBOL, ','):
             self.parameter_list()
 
@@ -274,23 +283,13 @@ class Parser:
         <parameter> ::= <variable_declaration> (in|out)
         """
 
-        try:
-            if not self.variable_declaration():
-                self.error("expected type mark")
-                self.skip_until((',', ')'))
-                return True
-        except ParseError as e:
-            self.error(e.message, e.token)
-            self.skip_until((',', ')'))
-            return False
+        self.variable_declaration()
 
         if self.token.type != Tokens.KEYWORD:
-            self.error("expected keyword 'in' or 'out'", self.token)
-            return False
+            raise ParseError("expected keyword 'in' or 'out'", self.token)
 
         if self.token.value not in ('in', 'out'):
-            self.error("expected 'in' or 'out' following variable")
-            return False
+            raise ParseError("expected 'in' or 'out' following variable", self.token)
 
         isin = self.match(Tokens.KEYWORD, 'in')
 
@@ -306,8 +305,6 @@ class Parser:
         """
 
         typemark = self.type_mark()
-        if not typemark:
-            return False
 
         name = self.match(Tokens.IDENTIFIER)
         if not name:
@@ -330,7 +327,7 @@ class Parser:
         if self.match(Tokens.KEYWORD, 'float'): return Tokens.FLOAT
         if self.match(Tokens.KEYWORD, 'bool'): return Tokens.BOOL
         if self.match(Tokens.KEYWORD, 'string'): return Tokens.STRING
-        return None
+        raise ParseError("expected type mark")
 
     def statement(self):
         """
@@ -342,7 +339,6 @@ class Parser:
         if self.loop_statement():       return 'loop'
         if self.assignment_statement(): return 'assignment'
         raise ParseError("invalid statement")
-        return None
 
     def statements(self):
         """
@@ -351,19 +347,11 @@ class Parser:
 
         while self.token.value not in ('EOF', 'else', 'end'):
 
-            try:
+            with self.resync('\n', consume=True):
                 self.statement()
-            except ParseError as e:
-                self.error(e.message, e.token)
-                self.skip_line()
-                continue
-            except ScanError:
-                self.skip_line()
-                continue
 
-            if not self.match(Tokens.SYMBOL, ";"):
-                self.error("expected ';' after statement ", token=self.prev_token, after_token=True)
-                continue
+                if not self.match(Tokens.SYMBOL, ";"):
+                    self.error("expected ';' after statement ", token=self.prev_token, after_token=True)
 
         # consume the 'end' token if there is one
         self.match(Tokens.KEYWORD, 'end')
@@ -419,30 +407,24 @@ class Parser:
         else_label = self.gen.new_label()
         end_label = self.gen.new_label()
 
-        # parsing the expression can raise an exception so we need to catch it
-        # if there is an exception just skip the line and continue to the body
-        # of the if statement
-        try:
+        exp_addr, exp_type = None, None
+
+        # if the expression fails try to find either the right paren or a new line
+        with self.resync([')', '\n']):
 
             exp_addr, exp_type = self.expression()
 
             if exp_type != Tokens.BOOL:
                 raise ParseError("expression must evaluate to type boolean")
 
-            if not self.match(Tokens.SYMBOL, ')'):
-                raise ParseError("expected ')' after expression")
+        if not self.match(Tokens.SYMBOL, ')'):
+            self.erro("expected ')' after expression", self.prev_token)
 
-            if not self.match(Tokens.KEYWORD, 'then'):
-                raise ParseError("expected 'then'")
+        if not self.match(Tokens.KEYWORD, 'then'):
+            self.error("expected 'then'", self.prev_token)
 
-            # if the branch is not taken jump to the else
-            self.gen.write("if(R[%d] == 0) { goto %s; }" % (exp_addr, else_label))
-
-        except ParseError as e:
-            self.error(e.message, e.token)
-            self.skip_line()
-        except ScanError:
-            self.skip_line()
+        # if the branch is not taken jump to the else
+        self.gen.write("if(R[%s] == 0) { goto %s; }" % (exp_addr, else_label))
 
         # process the body of the if block
         self.statements()
@@ -480,7 +462,7 @@ class Parser:
 
         self.gen.put_label(loop_label)
 
-        try:
+        with self.resync('\n', consume=True):
 
             if not self.assignment_statement():
                 raise ParseError("expected assignment statement")
@@ -492,22 +474,16 @@ class Parser:
             if exp_addr is None:
                 raise ParseError("invalid expression")
 
-            if not self.match(Tokens.SYMBOL, ')'):
-                raise ParseError("expected closing ')'", self.prev_token)
-
             self.gen.write("if (R[%d] == 0) { goto %s; }" % (exp_addr, end_label))
 
-        except ParseError as e:
-            self.error(e.message, e.token)
-            self.skip_line()
-        except ScanError:
-            self.skip_line()
+            if not self.match(Tokens.SYMBOL, ')'):
+                raise ParseError("expected closing ')' but found '%r'" % self.token, self.prev_token, after_token=True)
 
         # consume the body of the loop
         self.statements()
 
         if not self.match(Tokens.KEYWORD, 'for'):
-            raise ParseError("expected 'for'")
+            self.error("expected 'for'")
 
         self.gen.goto_label(loop_label)
         self.gen.put_label(end_label)
@@ -541,7 +517,7 @@ class Parser:
             operation = self.matched_token.value
             rhs_addr, rhs_type = rhs()
             if lhs_type != rhs_type:
-                raise ParseError("expression type error. '%s' and '%s' incompatible." % (lhs_type, rhs_type))
+                raise ParseError("expression type error. '%s' and '%s' incompatible." % (lhs_type, rhs_type), self.prev_token)
             lhs_addr = self.gen.set_new_reg("R[%d] %s R[%d]" % (lhs_addr, operation, rhs_addr))
             if result_is_bool:
                 lhs_type = Tokens.BOOL

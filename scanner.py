@@ -107,9 +107,10 @@ class Scanner:
                         token.value += next_char
                         char, next_char = next(col_iter)
 
-                    yield token
-
-                    continue
+                    # check to see if the final token value is a valid symbol
+                    if token.value in Tokens.symbols:
+                        yield token
+                        continue
 
                 """
                 Keywords and identifiers

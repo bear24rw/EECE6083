@@ -45,12 +45,12 @@ class Parser:
 
         self.print_message(message, label="warning", token=token, color=Color.YELLOW)
 
-    def error(self, message, token=None):
+    def error(self, message, token=None, after_token=False):
 
         self.has_errors = True
-        self.print_message(message, label="error", token=token, color=Color.RED)
+        self.print_message(message, label="error", token=token, after_token=after_token, color=Color.RED)
 
-    def print_message(self, message, label="info", token=None, color=Color.WHITE):
+    def print_message(self, message, label="info", token=None, after_token=False, color=Color.WHITE):
 
         if token is None:
             token = self.token
@@ -60,9 +60,18 @@ class Parser:
         filename = token.filename
         line_str = token.line_str
 
+        # calculate the start of the printed mark by ignoring all leading whitespace
+        mark_start = col_num - (len(line_str) - len(line_str.lstrip()))
+        mark_length = len(token.value)
+
+        # check if we want to place the mark right after the token
+        if after_token:
+            mark_start = mark_start + mark_length
+            mark_length = 1
+
         print Color.BOLD + Color.WHITE + "%s:%s:%s: " % (filename, line_num, col_num) + color + "%s: " % label + Color.WHITE + message
-        print Color.DEFAULT + line_str
-        print Color.GREEN + "%s^%s" % (' '*(col_num-1), '~'*(len(token.value)-1)) + Color.DEFAULT
+        print Color.DEFAULT + line_str.strip()
+        print Color.GREEN + "%s^%s" % (' '*(mark_start-1), '~'*(mark_length-1)) + Color.DEFAULT
 
     def get_next_token(self):
 
@@ -78,7 +87,7 @@ class Parser:
                 continue
             break
 
-        print "Current token: <%s,%r>" % (self.token.type, self.token.value)
+        #print "Current token: <%s,%r>" % (self.token.type, self.token.value)
 
     def match(self, type, value=None):
 
@@ -102,16 +111,27 @@ class Parser:
 
         return False
 
+    def skip_until(self, find, consume=False):
+        """
+        Skips tokens until we hit the token with value 'find'
+        """
+        # TODO: handle scanner errors, EOF
+
+        if isinstance(find, str):
+            find = [find]
+
+        while self.token.value not in find:
+            self.token = next(self.tokens)
+
+        if consume:
+            self.token = next(self.tokens)
+
+
     def skip_line(self):
         """
         Skips over a line in the token stream
-        This is useful to try and recover from errors
         """
-        while self.token.value != '\n' and self.token.type != Tokens.INVALID and self.token.type != Tokens.COMMENT:
-            self.token = next(self.tokens)
-
-        # at this point the current token in '\n' so just skip to the next one
-        self.token = next(self.tokens)
+        self.skip_until('\n', consume=True)
 
     def program(self):
         """
@@ -137,28 +157,9 @@ class Parser:
                            end program
         """
 
-        while True:
+        self.declarations()
 
-            if self.match(Tokens.KEYWORD, 'begin'):
-                break
-
-            try:
-                self.declaration()
-            except ParseError as e:
-                self.error(e.message, e.token)
-                self.skip_line()
-                continue
-            except ScanError:
-                self.skip_line()
-                continue
-
-            if not self.match(Tokens.SYMBOL, ';'):
-                self.error("expected ';' after declaration", token=self.prev_token)
-                continue
-
-            # don't use match() since it might iterate past end
-            if self.token.type == Tokens.SPECIAL and self.token.value == 'EOF':
-                break
+        self.match(Tokens.KEYWORD, 'begin')
 
         self.statements()
 
@@ -176,16 +177,129 @@ class Parser:
         else:
             is_global = False
 
-        is_var = self.variable_declaration(is_global)
-        is_pro = self.procedure_declaration(is_global)
+        if self.procedure_declaration(is_global):
+            return True
 
-        if not is_var and not is_pro:
-            raise ParseError("expected variable or procedure declaration")
+        if self.variable_declaration(is_global)
+            return True
+
+        raise ParseError("expected variable or procedure declaration")
+
+    def declarations(self):
+        """
+        Helper function to process multiple lines of delcarations
+        """
+
+        while self.token.value not in ('EOF', 'begin'):
+
+            try:
+                self.declaration()
+            except ParseError as e:
+                self.error(e.message, e.token)
+                self.skip_line()
+                continue
+            except ScanError:
+                self.skip_line()
+                continue
+
+            if not self.match(Tokens.SYMBOL, ';'):
+                self.error("expected ';' after declaration", self.prev_token, after_token=True)
+                continue
+
 
     def procedure_declaration(self, isglobal):
+        """
+        <procedure_declaration> ::= <procedure_header><procedure_body>
+        """
+        if not self.procedure_header(isglobal):
+            return False
+        self.procedure_body()
+        return True
+
+    def procedure_body(self):
+        """
+        <procedure_body> ::= (<declaration>;)*
+                             begin
+                                (<statement>;)*
+                             end procedure
+        """
+
+        self.declarations()
+
+        self.match(Tokens.KEYWORD, 'begin')
+
+        self.statements()
+
+        if not self.match(Tokens.KEYWORD, "procedure"):
+            self.error("expected 'procedure' but found '%s'" % self.token.value)
+
+
+    def procedure_header(self, isglobal):
+        """
+        <procedure_header> ::= procedure <identifier> ([<parameter_list>])
+        """
+
+        if not self.match(Tokens.KEYWORD, 'procedure'):
+            return False
+
+        name = self.match(Tokens.IDENTIFIER)
+        if not name:
+            self.error("expected procedure identifier")
+
+        if not self.match(Tokens.SYMBOL, '('):
+            self.error("expected '('")
+
+        self.parameter_list()
+
+        if not self.match(Tokens.SYMBOL, ')'):
+            self.error("expected ')'", self.prev_token, after_token=True)
+            self.skip_line()
+
+        return True
+
+    def parameter_list(self):
+        """
+        <parameter_list> ::= <parameter>,<parameter_list> |
+                             <parameter>
+        """
+
+        p = self.parameter()
+        if self.match(Tokens.SYMBOL, ','):
+            self.parameter_list()
+
         return False
 
-    def variable_declaration(self, isglobal):
+    def parameter(self):
+        """
+        <parameter> ::= <variable_declaration> (in|out)
+        """
+
+        try:
+            if not self.variable_declaration():
+                self.error("expected type mark")
+                self.skip_until((',', ')'))
+                return True
+        except ParseError as e:
+            self.error(e.message, e.token)
+            self.skip_until((',', ')'))
+            return False
+
+        if self.token.type != Tokens.KEYWORD:
+            self.error("expected keyword 'in' or 'out'", self.token)
+            return False
+
+        if self.token.value not in ('in', 'out'):
+            self.error("expected 'in' or 'out' following variable")
+            return False
+
+        isin = self.match(Tokens.KEYWORD, 'in')
+
+        if not isin:
+            isout = self.match(Tokens.KEYWORD, 'out')
+
+        return True
+
+    def variable_declaration(self, isglobal=False):
         """
         <variable_declaration> ::= <type_mark><identifier>
                                    [[<array_size>]]
@@ -248,7 +362,7 @@ class Parser:
                 continue
 
             if not self.match(Tokens.SYMBOL, ";"):
-                self.error("expected ';' after statement ", token=self.prev_token)
+                self.error("expected ';' after statement ", token=self.prev_token, after_token=True)
                 continue
 
         # consume the 'end' token if there is one
@@ -279,7 +393,7 @@ class Parser:
             return False
 
         if dest_type != exp_type:
-            raise ParseError("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type))
+            raise ParseError("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type), self.prev_token)
 
         self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
 
@@ -372,7 +486,7 @@ class Parser:
                 raise ParseError("expected assignment statement")
 
             if not self.match(Tokens.SYMBOL, ';'):
-                raise ParseError("expected ';' following statement", self.prev_token)
+                raise ParseError("expected ';' after statement", self.prev_token)
 
             exp_addr, _ = self.expression()
             if exp_addr is None:

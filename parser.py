@@ -341,8 +341,8 @@ class Parser:
         """
         if self.if_statement():         return
         if self.loop_statement():       return
-        if self.assignment_statement(): return
         if self.procedure_call():       return
+        if self.assignment_statement(): return
         if self.return_statement():     return
         raise ParseError("invalid statement")
 
@@ -374,16 +374,23 @@ class Parser:
         <procedure_call> ::= <identifier>([<argument_list>])
         """
 
-        name = self.match(Tokens.IDENTIFIER)
+        # don't consume the identifier until we are sure it's
+        # a procedure call and not an assignment statement
 
-        if name is None:
+        if not self.token.type == Tokens.IDENTIFIER:
             return False
 
-        if name not in self.global_symbols:
+        if self.token.value is None:
             return False
 
-        if self.global_symbols[name].type != "procedure":
+        if self.token.value not in self.global_symbols:
             return False
+
+        if self.global_symbols[self.token.value].type != "procedure":
+            return False
+
+        # we know it's a procedure call so we're safe to consume
+        self.get_next_token()
 
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")

@@ -128,12 +128,10 @@ class Parser:
         if consume:
             self.token = next(self.tokens)
 
+        # always consume the newlines
+        if self.token.value == '\n' and '\n' in find:
+            self.skip_until('\n', consume=True)
 
-    def skip_line(self):
-        """
-        Skips over a line in the token stream
-        """
-        self.skip_until('\n', consume=True)
 
     @contextmanager
     def resync(self, find=None, consume=False, at_next_token=False):
@@ -201,17 +199,16 @@ class Parser:
 
     def declarations(self):
         """
-        Helper function to process multiple lines of delcarations
+        Helper function to process multiple lines of declarations
         """
 
         while self.token.value not in ('EOF', 'begin'):
 
-            with self.resync('\n'):
+            with self.resync(['begin', '\n']):
                 self.declaration()
 
-            if not self.match(Tokens.SYMBOL, ';'):
-                self.error("expected ';' after declaration", self.prev_token, after_token=True)
-                continue
+                if not self.match(Tokens.SYMBOL, ';'):
+                    self.error("expected ';' after declaration", self.prev_token, after_token=True)
 
 
     def procedure_declaration(self, isglobal):
@@ -253,6 +250,12 @@ class Parser:
         if not name:
             self.error("expected procedure identifier")
 
+        if name in self.global_symbols:
+            # TODO: display what it symbol is already using it
+            self.error("identifier already in use")
+        else:
+            self.global_symbols[name] = Symbol(name, "procedure")
+
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
 
@@ -260,7 +263,7 @@ class Parser:
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' or ','", self.prev_token, after_token=True)
-            self.skip_line()
+            self.skip_until('\n')
 
         return True
 
@@ -308,12 +311,12 @@ class Parser:
 
         name = self.match(Tokens.IDENTIFIER)
         if not name:
-            raise ParseError("expected identifier but found '%s'" % self.token.type)
+            raise ParseError("expected identifier", self.prev_token, after_token=True)
 
         if isglobal:
 
             if name in self.global_symbols:
-                raise ParseError("duplicate declaration")
+                raise ParseError("duplicate declaration", self.prev_token)
 
             self.global_symbols[name] = Symbol(name, typemark)
 
@@ -334,10 +337,14 @@ class Parser:
         <statement> ::= <assignment_statement>
                         | <if_statement>
                         | <loop_statement>
+                        | <procedure_call>
+                        | <return_statement>
         """
-        if self.if_statement():         return 'if'
-        if self.loop_statement():       return 'loop'
-        if self.assignment_statement(): return 'assignment'
+        if self.if_statement():         return
+        if self.loop_statement():       return
+        if self.assignment_statement(): return
+        if self.procedure_call():       return
+        if self.return_statement():     return
         raise ParseError("invalid statement")
 
     def statements(self):
@@ -356,6 +363,54 @@ class Parser:
         # consume the 'end' token if there is one
         self.match(Tokens.KEYWORD, 'end')
 
+    def return_statement(self):
+        """
+        <return_statement> ::= return
+        """
+
+        return self.match(Tokens.KEYWORD, "return")
+
+    def procedure_call(self):
+        """
+        <procedure_call> ::= <identifier>([<argument_list>])
+        """
+
+        name = self.match(Tokens.IDENTIFIER)
+
+        if name is None:
+            return False
+
+        if name not in self.global_symbols:
+            return False
+
+        if self.global_symbols[name].type != "procedure":
+            return False
+
+        if not self.match(Tokens.SYMBOL, '('):
+            self.error("expected '('")
+
+        self.argument_list()
+
+        if not self.match(Tokens.SYMBOL, ')'):
+            self.error("expected ')' after argument list")
+
+        return True
+
+    def argument_list(self):
+        """
+        <argument_list> ::=   <expression>,<argument_list>
+                            | <expression>
+        """
+
+        with self.resync([',', ')', '\n']):
+
+            exp_addr, exp_type = self.expression()
+
+            if exp_addr is None:
+                raise ParseError("invalid expression")
+
+        if self.match(Tokens.SYMBOL, ','):
+            self.argument_list()
 
     def assignment_statement(self):
         """

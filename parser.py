@@ -195,8 +195,6 @@ class Parser:
         if self.variable_declaration(is_global):
             return
 
-        raise ParseError("expected variable or procedure declaration")
-
     def declarations(self):
         """
         Helper function to process multiple lines of declarations
@@ -259,7 +257,8 @@ class Parser:
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
 
-        self.parameter_list()
+        if self.token.value != ')':
+            self.parameter_list()
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' or ','", self.prev_token, after_token=True)

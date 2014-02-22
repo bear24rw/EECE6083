@@ -8,16 +8,17 @@ class Symbol:
 
     current_addr = 0
 
-    def __init__(self, name, type):
+    def __init__(self, name, type, size=1):
         self.name = name
         self.type = type
         self.addr = Symbol.current_addr
         self.used = False
+        self.size = size
 
-        Symbol.current_addr += 1
+        Symbol.current_addr += int(size)
 
     def __repr__(self):
-        return "<%r, %r, %r>" % (self.name, self.type, self.addr)
+        return "<%r, %r, size=%r, addr=%r>" % (self.name, self.type, self.size, self.addr)
 
 
 # scan error is raised when the parser encounters an invalid token
@@ -317,7 +318,22 @@ class Parser:
             if name in self.global_symbols:
                 raise ParseError("duplicate declaration", self.prev_token)
 
+        if not self.match(Tokens.SYMBOL, '['):
             self.global_symbols[name] = Symbol(name, typemark)
+            return True
+
+        size = self.match(Tokens.INTEGER)
+
+        if not size:
+            raise ParseError("expected positive integer specifying array size")
+
+        if size == '0':
+            raise ParseError("array size must be at least 1", self.prev_token)
+
+        if not self.match(Tokens.SYMBOL, ']'):
+            raise ParseError("expected closing ']'")
+
+        self.global_symbols[name] = Symbol(name, typemark, size=size)
 
         return True
 

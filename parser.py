@@ -436,15 +436,17 @@ class Parser:
                             | <expression>
         """
 
-        with self.resync([',', ')', '\n']):
+        while True:
 
-            exp_addr, exp_type = self.expression()
+            with self.resync([',', ')', '\n']):
 
-            if exp_addr is None:
-                raise ParseError("invalid expression")
+                exp_addr, exp_type = self.expression()
 
-        if self.match(Tokens.SYMBOL, ','):
-            self.argument_list()
+                if exp_addr is None:
+                    raise ParseError("invalid expression")
+
+            if not self.match(Tokens.SYMBOL, ','):
+                break
 
     def assignment_statement(self):
         """

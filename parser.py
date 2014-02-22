@@ -11,14 +11,18 @@ class Symbol:
     def __init__(self, name, type, size=1):
         self.name = name
         self.type = type
+        self.size = size
         self.addr = Symbol.current_addr
         self.used = False
-        self.size = size
+        self.param_types = []
 
         Symbol.current_addr += int(size)
 
     def __repr__(self):
-        return "<%r, %r, size=%r, addr=%r>" % (self.name, self.type, self.size, self.addr)
+        if self.type == 'procedure':
+            return "<%r, %r, size=%r, addr=%r, param_types=%r>" % (self.name, self.type, self.size, self.addr, self.param_types)
+        else:
+            return "<%r, %r, size=%r, addr=%r>" % (self.name, self.type, self.size, self.addr)
 
 
 # scan error is raised when the parser encounters an invalid token
@@ -259,11 +263,12 @@ class Parser:
             self.error("expected '('")
 
         if self.token.value != ')':
-            self.parameter_list()
+            self.global_symbols[name].param_types = self.parameter_list()
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' or ','", self.prev_token, after_token=True)
             self.skip_until('\n')
+
 
         return True
 
@@ -273,20 +278,25 @@ class Parser:
                              <parameter>
         """
 
-        with self.resync((',',')')):
-            self.parameter()
+        param_types = []
 
-        if self.match(Tokens.SYMBOL, ','):
-            self.parameter_list()
+        while True:
 
-        return False
+            with self.resync((',',')')):
+                param = self.parameter()
+                param_types.append(param.type)
+
+            if not self.match(Tokens.SYMBOL, ','):
+                break
+
+        return param_types
 
     def parameter(self):
         """
         <parameter> ::= <variable_declaration> (in|out)
         """
 
-        self.variable_declaration()
+        symbol = self.variable_declaration()
 
         if self.token.type != Tokens.KEYWORD:
             raise ParseError("expected keyword 'in' or 'out'", self.token)
@@ -299,12 +309,14 @@ class Parser:
         if not isin:
             isout = self.match(Tokens.KEYWORD, 'out')
 
-        return True
+        return symbol
 
     def variable_declaration(self, isglobal=False):
         """
         <variable_declaration> ::= <type_mark><identifier>
                                    [[<array_size>]]
+
+        Returns the symbol object of the new symbol
         """
 
         typemark = self.type_mark()
@@ -320,7 +332,7 @@ class Parser:
 
         if not self.match(Tokens.SYMBOL, '['):
             self.global_symbols[name] = Symbol(name, typemark)
-            return True
+            return self.global_symbols[name]
 
         size = self.match(Tokens.INTEGER)
 
@@ -335,7 +347,7 @@ class Parser:
 
         self.global_symbols[name] = Symbol(name, typemark, size=size)
 
-        return True
+        return self.global_symbols[name]
 
     def type_mark(self):
         """

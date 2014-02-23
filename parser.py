@@ -405,16 +405,18 @@ class Parser:
         # don't consume the identifier until we are sure it's
         # a procedure call and not an assignment statement
 
+        name = self.token.value
+
         if not self.token.type == Tokens.IDENTIFIER:
             return False
 
-        if self.token.value is None:
+        if name is None:
             return False
 
-        if self.token.value not in self.global_symbols:
+        if name not in self.global_symbols:
             return False
 
-        if self.global_symbols[self.token.value].type != "procedure":
+        if self.global_symbols[name].type != "procedure":
             return False
 
         # we know it's a procedure call so we're safe to consume

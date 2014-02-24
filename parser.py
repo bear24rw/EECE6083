@@ -42,6 +42,7 @@ class Parser:
         self.matched_token = None
         self.token = None
 
+        self.scope_level = 0
         self.global_symbols = {}
         self.symbols = [{}]
 
@@ -154,10 +155,12 @@ class Parser:
 
     def enter_scope(self):
         self.symbols.append({})
+        self.scope_level += 1
 
     def exit_scope(self):
         try:
             self.symbols.pop()
+            self.scope_level -= 1
         except IndexError:
             self.error("attempted to exit outermost scope")
 
@@ -228,6 +231,9 @@ class Parser:
         else:
             is_global = False
 
+        if is_global and self.scope_level > 0:
+            self.error("global declaration only allowed in outermost scope", self.prev_token)
+
         if self.procedure_declaration(is_global):
             return
 
@@ -248,11 +254,11 @@ class Parser:
                     self.error("expected ';' after declaration", self.prev_token, after_token=True)
 
 
-    def procedure_declaration(self, isglobal):
+    def procedure_declaration(self, is_global):
         """
         <procedure_declaration> ::= <procedure_header><procedure_body>
         """
-        if not self.procedure_header(isglobal):
+        if not self.procedure_header(is_global):
             return False
         self.procedure_body()
         self.exit_scope()
@@ -276,7 +282,7 @@ class Parser:
             self.error("expected 'procedure' but found '%s'" % self.token.value)
 
 
-    def procedure_header(self, isglobal):
+    def procedure_header(self, is_global):
         """
         <procedure_header> ::= procedure <identifier> ([<parameter_list>])
         """
@@ -294,13 +300,13 @@ class Parser:
             self.error("identifier already in use")
 
         # add the symbol to the current (parent) scope
-        self.add_symbol(symbol, isglobal)
+        self.add_symbol(symbol, is_global)
 
         # enter the new scope and also add it there so we can do recursion we
         # need to do this before parsing the parameters since the parameter
         # function adds symbols to the current scope
         self.enter_scope()
-        self.add_symbol(symbol, isglobal)
+        self.add_symbol(symbol, is_global)
 
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
@@ -357,7 +363,7 @@ class Parser:
 
         return symbol
 
-    def variable_declaration(self, isglobal=False):
+    def variable_declaration(self, is_global=False):
         """
         <variable_declaration> ::= <type_mark><identifier>
                                    [[<array_size>]]
@@ -391,7 +397,7 @@ class Parser:
                 raise ParseError("expected closing ']'")
 
         symbol = Symbol(name, typemark, size=size)
-        self.add_symbol(symbol, isglobal)
+        self.add_symbol(symbol, is_global)
 
         return symbol
 

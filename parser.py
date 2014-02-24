@@ -39,9 +39,11 @@ class Parser:
     def __init__(self, scanner, gen):
 
         self.has_errors = False
-        self.global_symbols = {}
         self.matched_token = None
         self.token = None
+
+        self.global_symbols = {}
+        self.symbols = [{}]
 
         self.gen = gen
         self.scanner = scanner
@@ -150,6 +152,38 @@ class Parser:
             if at_next_token: self.get_next_token()
             if find: self.skip_until(find, consume)
 
+    def enter_scope(self):
+        self.symbols.append({})
+
+    def exit_scope(self):
+        try:
+            self.symbols.pop()
+        except IndexError:
+            self.error("attempted to exit outermost scope")
+
+    def cur_symbols(self):
+        """
+        Returns a list of symbol names in the current scope
+        """
+        return self.symbols[-1].keys() + self.global_symbols.keys()
+
+    def add_symbol(self, x, is_global=False):
+        """
+        Adds a symbol to the current scope
+        """
+        if is_global:
+            self.global_symbols[x.name] = x
+        else:
+            self.symbols[-1][x.name] = x
+
+    def get_symbol(self, x):
+        if x in self.global_symbols:
+            return self.global_symbols[x]
+        elif x in self.symbols[-1]:
+            return self.symbols[-1][x]
+        else:
+            raise ParseError("Tried to lookup unknown symbol")
+
     def program(self):
         """
         <program> ::= <program_header><program_body>
@@ -221,6 +255,7 @@ class Parser:
         if not self.procedure_header(isglobal):
             return False
         self.procedure_body()
+        self.exit_scope()
         return True
 
     def procedure_body(self):
@@ -253,17 +288,25 @@ class Parser:
         if not name:
             self.error("expected procedure identifier")
 
-        if name in self.global_symbols:
-            # TODO: display what it symbol is already using it
+        symbol = Symbol(name, "procedure")
+
+        if name in self.cur_symbols():
             self.error("identifier already in use")
-        else:
-            self.global_symbols[name] = Symbol(name, "procedure")
+
+        # add the symbol to the current (parent) scope
+        self.add_symbol(symbol, isglobal)
+
+        # enter the new scope and also add it there so we can do recursion we
+        # need to do this before parsing the parameters since the parameter
+        # function adds symbols to the current scope
+        self.enter_scope()
+        self.add_symbol(symbol, isglobal)
 
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
 
         if self.token.value != ')':
-            self.global_symbols[name].param_types = self.parameter_list()
+            symbol.param_types = self.parameter_list()
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' or ','", self.prev_token, after_token=True)
@@ -285,6 +328,7 @@ class Parser:
             with self.resync((',',')')):
                 param = self.parameter()
                 param_types.append(param.type)
+                self.add_symbol(param)
 
             if not self.match(Tokens.SYMBOL, ','):
                 break
@@ -305,6 +349,8 @@ class Parser:
             raise ParseError("expected 'in' or 'out' following variable", self.token)
 
         isin = self.match(Tokens.KEYWORD, 'in')
+        if isin:
+            symbol.used = True
 
         if not isin:
             isout = self.match(Tokens.KEYWORD, 'out')
@@ -322,32 +368,32 @@ class Parser:
         typemark = self.type_mark()
 
         name = self.match(Tokens.IDENTIFIER)
+
         if not name:
             raise ParseError("expected identifier", self.prev_token, after_token=True)
 
-        if isglobal:
+        if name in self.cur_symbols():
+            raise ParseError("duplicate declaration of '%s'" % name, self.prev_token)
 
-            if name in self.global_symbols:
-                raise ParseError("duplicate declaration", self.prev_token)
+        size = 1
 
-        if not self.match(Tokens.SYMBOL, '['):
-            self.global_symbols[name] = Symbol(name, typemark)
-            return self.global_symbols[name]
+        if self.match(Tokens.SYMBOL, '['):
 
-        size = self.match(Tokens.INTEGER)
+            size = self.match(Tokens.INTEGER)
 
-        if not size:
-            raise ParseError("expected positive integer specifying array size")
+            if not size:
+                raise ParseError("expected positive integer specifying array size")
 
-        if size == '0':
-            raise ParseError("array size must be at least 1", self.prev_token)
+            if size == '0':
+                raise ParseError("array size must be at least 1", self.prev_token)
 
-        if not self.match(Tokens.SYMBOL, ']'):
-            raise ParseError("expected closing ']'")
+            if not self.match(Tokens.SYMBOL, ']'):
+                raise ParseError("expected closing ']'")
 
-        self.global_symbols[name] = Symbol(name, typemark, size=size)
+        symbol = Symbol(name, typemark, size=size)
+        self.add_symbol(symbol, isglobal)
 
-        return self.global_symbols[name]
+        return symbol
 
     def type_mark(self):
         """
@@ -413,10 +459,12 @@ class Parser:
         if name is None:
             return False
 
-        if name not in self.global_symbols:
+        # TODO: check if next token is ( so we can throw undefined procedure
+
+        if name not in self.cur_symbols():
             return False
 
-        if self.global_symbols[name].type != "procedure":
+        if self.get_symbol(name).type != "procedure":
             return False
 
         # we know it's a procedure call so we're safe to consume
@@ -464,9 +512,9 @@ class Parser:
 
         # we are doing an assignment but the destination was invalid
         if dest_addr is None:
-            raise ParseError("destination identifier undefined", self.prev_token)
+            raise ParseError("destination identifier '%s' undefined" % dest_name, self.prev_token)
 
-        self.global_symbols[dest_name].used = True
+        self.get_symbol(dest_name).used = True
 
         exp_addr, exp_type = self.expression()
 
@@ -587,13 +635,14 @@ class Parser:
         """
         <destination> ::= <identifier>[[<expression>]]
         """
+        # TODO: return the symbol object
 
         name = self.match(Tokens.IDENTIFIER)
 
-        if not name in self.global_symbols:
+        if name not in self.cur_symbols():
             return (name, None, None)
 
-        return (name, self.global_symbols[name].addr, self.global_symbols[name].type)
+        return (name, self.get_symbol(name).addr, self.get_symbol(name).type)
 
     def operation(self, lhs, operations, rhs, result_is_bool=False):
         """
@@ -699,18 +748,21 @@ class Parser:
 
             name = self.matched_token.value
 
-            if not name in self.global_symbols:
+            if name not in self.cur_symbols():
                 raise ParseError("undefined identifier", token=self.prev_token)
 
-            if not self.global_symbols[name].used:
+            if not self.get_symbol(name).used:
+                # TODO: if it is a global variable and we are currently
+                # processing a procedure than this false triggers. Maybe
+                # only check for non-global variables?
                 self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
 
-            addr = self.gen.set_new_reg("M[%d]" % self.global_symbols[name].addr)
+            addr = self.gen.set_new_reg("M[%d]" % self.get_symbol(name).addr)
 
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
 
-            return (addr, self.global_symbols[name].type)
+            return (addr, self.get_symbol(name).type)
 
         """
         Numbers

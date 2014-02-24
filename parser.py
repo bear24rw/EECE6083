@@ -258,13 +258,14 @@ class Parser:
         """
         <procedure_declaration> ::= <procedure_header><procedure_body>
         """
-        if not self.procedure_header(is_global):
+        name = self.procedure_header(is_global)
+        if not name:
             return False
-        self.procedure_body()
+        self.procedure_body(name)
         self.exit_scope()
         return True
 
-    def procedure_body(self):
+    def procedure_body(self, name):
         """
         <procedure_body> ::= (<declaration>;)*
                              begin
@@ -276,7 +277,13 @@ class Parser:
 
         self.match(Tokens.KEYWORD, 'begin')
 
+        label = self.gen.new_label(name+'_start')
+        self.gen.put_label(label)
+
         self.statements()
+
+        label = self.gen.new_label(name+'_end')
+        self.gen.put_label(label)
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -318,8 +325,7 @@ class Parser:
             self.error("expected ')' or ','", self.prev_token, after_token=True)
             self.skip_until('\n')
 
-
-        return True
+        return name
 
     def parameter_list(self):
         """
@@ -551,8 +557,8 @@ class Parser:
 
         # generate two labels to use for jumping to the
         # else block and the end of the if block
-        else_label = self.gen.new_label()
-        end_label = self.gen.new_label()
+        else_label = self.gen.new_label('else')
+        end_label = self.gen.new_label('endif')
 
         exp_addr, exp_type = None, None
 
@@ -604,8 +610,8 @@ class Parser:
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '(' after 'for'")
 
-        loop_label = self.gen.new_label()
-        end_label = self.gen.new_label()
+        loop_label = self.gen.new_label('for')
+        end_label = self.gen.new_label('endfor')
 
         self.gen.put_label(loop_label)
 

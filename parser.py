@@ -14,13 +14,16 @@ class Symbol:
         self.size = size
         self.addr = Symbol.current_addr
         self.used = False
-        self.param_types = []
+        self.params = []
+        self.label = ""
+        self.direction = ""
+        self.current_reg = None
 
         Symbol.current_addr += int(size)
 
     def __repr__(self):
         if self.type == 'procedure':
-            return "<%r, %r, size=%r, addr=%r, param_types=%r>" % (self.name, self.type, self.size, self.addr, self.param_types)
+            return "<%r, %r, size=%r, addr=%r, params=%r>" % (self.name, self.type, self.size, self.addr, [(x.name, x.type, x.direction) for x in self.params])
         else:
             return "<%r, %r, size=%r, addr=%r>" % (self.name, self.type, self.size, self.addr)
 
@@ -215,6 +218,8 @@ class Parser:
 
         self.match(Tokens.KEYWORD, 'begin')
 
+        self.gen.put_label("main")
+
         self.statements()
 
         if not self.match(Tokens.KEYWORD, "program"):
@@ -279,6 +284,11 @@ class Parser:
 
         label = self.gen.new_label(name+'_start')
         self.gen.put_label(label)
+        self.get_symbol(name).label = label
+
+        # pop all the arguments off the stack
+        for i, param in enumerate(self.get_symbol(name).params):
+            pass
 
         self.statements()
 
@@ -319,7 +329,7 @@ class Parser:
             self.error("expected '('")
 
         if self.token.value != ')':
-            symbol.param_types = self.parameter_list()
+            symbol.params = self.parameter_list()
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' or ','", self.prev_token, after_token=True)
@@ -333,19 +343,19 @@ class Parser:
                              <parameter>
         """
 
-        param_types = []
+        params = []
 
         while True:
 
             with self.resync((',',')')):
                 param = self.parameter()
-                param_types.append(param.type)
+                params.append(param)
                 self.add_symbol(param)
 
             if not self.match(Tokens.SYMBOL, ','):
                 break
 
-        return param_types
+        return params
 
     def parameter(self):
         """
@@ -360,12 +370,13 @@ class Parser:
         if self.token.value not in ('in', 'out'):
             raise ParseError("expected 'in' or 'out' following variable", self.token)
 
-        isin = self.match(Tokens.KEYWORD, 'in')
-        if isin:
+        if self.token.value == 'in':
+            self.match(Tokens.KEYWORD, 'in')
+            symbol.direction = 'in'
             symbol.used = True
-
-        if not isin:
-            isout = self.match(Tokens.KEYWORD, 'out')
+        else:
+            self.match(Tokens.KEYWORD, 'out')
+            symbol.direction = 'out'
 
         return symbol
 
@@ -485,10 +496,27 @@ class Parser:
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
 
-        self.argument_list(name)
+        args = self.argument_list(name)
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' after argument list")
+
+        # generate a label that we will return to after call is complete
+        return_label = self.gen.new_label("return_from_%s" % name)
+
+        # push return address onto the stack
+        reg = self.gen.set_new_reg("(int)&&%s" % return_label)
+        self.gen.push_stack(reg)
+
+        # push the addresses of all arguments onto the stack
+        for i, (addr, _) in enumerate(args):
+            # if this argument will be changed by the function we need to pass its address, not its value
+            if self.get_symbol(name).params[i].direction == 'out':
+                addr = self.gen.set_new_reg(addr)
+            self.gen.push_stack(addr)
+
+        self.gen.goto_label(self.get_symbol(name).label)
+        self.gen.put_label(return_label)
 
         return True
 
@@ -513,7 +541,7 @@ class Parser:
                 if exp_addr is None:
                     raise ParseError("invalid expression")
 
-                expected_type = self.get_symbol(procedure_name).param_types[argument_idx]
+                expected_type = self.get_symbol(procedure_name).params[argument_idx].type
                 if exp_type != expected_type:
                     self.error("argument type miss-match. expected '%s' but found '%s'" % (expected_type, exp_type), self.prev_token)
 
@@ -540,8 +568,6 @@ class Parser:
         if dest_addr is None:
             raise ParseError("destination identifier '%s' undefined" % dest_name, self.prev_token)
 
-        self.get_symbol(dest_name).used = True
-
         exp_addr, exp_type = self.expression()
 
         if exp_addr is None:
@@ -549,6 +575,9 @@ class Parser:
 
         if dest_type != exp_type:
             raise ParseError("cannot assign expression of type '%s' to destination of type '%s'" % (exp_type, dest_type), self.prev_token)
+
+        self.get_symbol(dest_name).current_reg = exp_addr
+        self.get_symbol(dest_name).used = True
 
         self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
 
@@ -777,6 +806,10 @@ class Parser:
             if name not in self.cur_symbols():
                 raise ParseError("undefined identifier", token=self.prev_token)
 
+            # if we already have this symbol in a register we dont need to asssign a new register
+            if self.get_symbol(name).current_reg:
+                return (self.get_symbol(name).current_reg, self.get_symbol(name).type)
+
             if not self.get_symbol(name).used:
                 # TODO: if it is a global variable and we are currently
                 # processing a procedure than this false triggers. Maybe
@@ -787,6 +820,9 @@ class Parser:
 
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
+
+            # keep track of what register contains this symbols value
+            self.get_symbol(name).current_reg = addr
 
             return (addr, self.get_symbol(name).type)
 

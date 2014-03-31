@@ -485,18 +485,22 @@ class Parser:
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
 
-        self.argument_list()
+        self.argument_list(name)
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' after argument list")
 
         return True
 
-    def argument_list(self):
+    def argument_list(self, procedure_name):
         """
         <argument_list> ::=   <expression>,<argument_list>
                             | <expression>
+
         """
+
+        arguments = []
+        argument_idx = 0
 
         while True:
 
@@ -504,11 +508,21 @@ class Parser:
 
                 exp_addr, exp_type = self.expression()
 
+                arguments.append((exp_addr, exp_type))
+
                 if exp_addr is None:
                     raise ParseError("invalid expression")
 
+                expected_type = self.get_symbol(procedure_name).param_types[argument_idx]
+                if exp_type != expected_type:
+                    self.error("argument type miss-match. expected '%s' but found '%s'" % (expected_type, exp_type), self.prev_token)
+
+                argument_idx += 1
+
             if not self.match(Tokens.SYMBOL, ','):
                 break
+
+        return arguments
 
     def assignment_statement(self):
         """

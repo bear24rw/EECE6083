@@ -39,3 +39,6 @@ class Gen:
 
     def goto_label(self, label):
         self.lines.append("goto %s" % label)
+
+    def push_stack(self, register):
+        self.write("M[SP++] = R[%s]\n" % register)

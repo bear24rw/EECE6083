@@ -43,3 +43,8 @@ class Gen:
     def push_stack(self, register):
         self.write("M[SP] = R[%s]" % register)
         self.write("SP++")
+
+    def pop_stack(self):
+        reg = self.set_new_reg("M[SP]")
+        self.write("SP--")
+        return reg

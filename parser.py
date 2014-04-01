@@ -288,15 +288,22 @@ class Parser:
 
         # pop all the arguments off the stack
         for i, param in enumerate(self.get_symbol(name).params):
-            pass
+            reg = self.gen.pop_stack()
 
         self.statements()
 
         label = self.gen.new_label(name+'_end')
         self.gen.put_label(label)
 
+        # pop the return address off the stack and goto it
+        reg = self.gen.pop_stack()
+        self.gen.write("goto *(void *)R[%s]" % reg)
+
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
+
+        # extra new line after each function block
+        self.gen.write("")
 
 
     def procedure_header(self, is_global):

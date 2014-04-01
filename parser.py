@@ -8,22 +8,23 @@ class Symbol:
 
     current_addr = 0
 
-    def __init__(self, name, type, size=1):
+    def __init__(self, name='', type='', size=1, direction=''):
         self.name = name
         self.type = type
         self.size = size
         self.addr = Symbol.current_addr
         self.used = False
         self.params = []
-        self.label = ""
-        self.direction = ""
+        self.label = name
+        self.direction = direction
         self.current_reg = None
 
-        Symbol.current_addr += int(size)
+        if type != "procedure":
+            Symbol.current_addr += int(size)
 
     def __repr__(self):
         if self.type == 'procedure':
-            return "<%r, %r, size=%r, addr=%r, params=%r>" % (self.name, self.type, self.size, self.addr, [(x.name, x.type, x.direction) for x in self.params])
+            return "<%r, %r, params=%r>" % (self.name, self.type, [(x.name, x.type, x.direction) for x in self.params])
         else:
             return "<%r, %r, size=%r, addr=%r>" % (self.name, self.type, self.size, self.addr)
 
@@ -53,6 +54,19 @@ class Parser:
         self.scanner = scanner
         self.tokens = scanner.token_iter()
         self.get_next_token()
+
+        # add the built-in function to the symbol table
+        self.global_symbols['putinteger'] = Symbol()
+        self.global_symbols['putinteger'].name = 'putinteger'
+        self.global_symbols['putinteger'].label = 'putinteger'
+        self.global_symbols['putinteger'].type = 'procedure'
+        self.global_symbols['putinteger'].params.append(Symbol(type="INTEGER", direction="in"))
+
+        self.global_symbols['putbool'] = Symbol()
+        self.global_symbols['putbool'].name = 'putbool'
+        self.global_symbols['putbool'].label = 'putbool'
+        self.global_symbols['putbool'].type = 'procedure'
+        self.global_symbols['putbool'].params.append(Symbol(type="BOOL", direction="in"))
 
     def warning(self, message, token=None):
 
@@ -297,7 +311,7 @@ class Parser:
 
         # pop the return address off the stack and goto it
         reg = self.gen.pop_stack()
-        self.gen.write("goto *(void *)R[%s]" % reg)
+        self.gen.write("goto *(void *)R[%s];" % reg)
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -522,6 +536,7 @@ class Parser:
                 addr = self.gen.set_new_reg(addr)
             self.gen.push_stack(addr)
 
+        print "[DEBUG] going to function %s with label %s" % (name, self.get_symbol(name).label)
         self.gen.goto_label(self.get_symbol(name).label)
         self.gen.put_label(return_label)
 
@@ -586,7 +601,7 @@ class Parser:
         self.get_symbol(dest_name).current_reg = exp_addr
         self.get_symbol(dest_name).used = True
 
-        self.gen.write("M[%s] = R[%s]" % (dest_addr, exp_addr))
+        self.gen.write("M[%s] = R[%s];" % (dest_addr, exp_addr))
 
         return True
 
@@ -882,9 +897,17 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print ""
+    print "Global Procedures"
+    print "-"*50
+    for x in parser.global_symbols:
+        if not parser.global_symbols[x].type == 'procedure': continue
+        print parser.global_symbols[x]
+
+    print ""
     print "Global Symbols"
     print "-"*50
     for x in parser.global_symbols:
+        if parser.global_symbols[x].type == 'procedure': continue
         print parser.global_symbols[x]
 
     print ""
@@ -892,3 +915,5 @@ if __name__ == "__main__":
     print "-"*50
     for line in gen.lines:
         print line
+
+    gen.write_file("out.c")

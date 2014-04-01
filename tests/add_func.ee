@@ -1,0 +1,13 @@
+program add_func is
+    integer a;
+    integer b;
+    global integer result;
+    global procedure add(integer x in, integer y in, integer z out)
+    begin
+        z := x + y;
+    end procedure;
+begin
+    a := 5;
+    b := 10;
+    add(a, b, result);
+end program;

@@ -6,21 +6,18 @@ from color import Color
 
 class Symbol:
 
-    current_addr = 0
-
     def __init__(self, name='', type='', size=1, direction=''):
         self.name = name
         self.type = type
         self.size = size
-        self.addr = Symbol.current_addr
+        self.addr = 0
         self.used = False
         self.params = []
         self.label = name
         self.direction = direction
         self.current_reg = None
-
-        if type != "procedure":
-            Symbol.current_addr += int(size)
+        self.indirect = False # M[R[current_reg]]
+        self.isglobal = False
 
     def __repr__(self):
         if self.type == 'procedure':
@@ -49,6 +46,8 @@ class Parser:
         self.scope_level = 0
         self.global_symbols = {}
         self.symbols = [{}]
+        self.global_addr = 0    # absolute address = global_addr
+        self.local_addr = 0     # absolute address = FP + local_addr
 
         self.gen = gen
         self.scanner = scanner
@@ -56,15 +55,11 @@ class Parser:
         self.get_next_token()
 
         # add the built-in function to the symbol table
-        self.global_symbols['putinteger'] = Symbol()
-        self.global_symbols['putinteger'].name = 'putinteger'
-        self.global_symbols['putinteger'].label = 'putinteger'
+        self.global_symbols['putinteger'] = Symbol('putinteger')
         self.global_symbols['putinteger'].type = 'procedure'
         self.global_symbols['putinteger'].params.append(Symbol(type="INTEGER", direction="in"))
 
-        self.global_symbols['putbool'] = Symbol()
-        self.global_symbols['putbool'].name = 'putbool'
-        self.global_symbols['putbool'].label = 'putbool'
+        self.global_symbols['putbool'] = Symbol('putbool')
         self.global_symbols['putbool'].type = 'procedure'
         self.global_symbols['putbool'].params.append(Symbol(type="BOOL", direction="in"))
 
@@ -173,6 +168,7 @@ class Parser:
     def enter_scope(self):
         self.symbols.append({})
         self.scope_level += 1
+        self.local_addr = 0
 
     def exit_scope(self):
         try:
@@ -193,8 +189,16 @@ class Parser:
         """
         if is_global:
             self.global_symbols[x.name] = x
+            self.global_symbols[x.name].addr = self.global_addr
+            self.global_symbols[x.name].isglobal = True
+            if x.type != 'procedure':
+                self.global_addr += x.size
         else:
+            print "local %s size %s" % (x.name, x.size)
             self.symbols[-1][x.name] = x
+            self.symbols[-1][x.name].addr = self.local_addr
+            if x.type != 'procedure':
+                self.local_addr += x.size
 
     def get_symbol(self, x):
         if x in self.global_symbols:
@@ -233,6 +237,9 @@ class Parser:
         self.match(Tokens.KEYWORD, 'begin')
 
         self.gen.put_label("main")
+
+        self.gen.comment("moving sp to top of local vars")
+        self.gen.dec_sp(self.local_addr)
 
         self.statements()
 
@@ -300,14 +307,20 @@ class Parser:
         self.gen.put_label(label)
         self.get_symbol(name).label = label
 
-        # pop all the arguments off the stack
-        for i, param in enumerate(self.get_symbol(name).params):
-            reg = self.gen.pop_stack()
+        self.gen.comment("moving sp to top of local vars")
+        self.gen.dec_sp(self.local_addr)
 
+        # map parameter symbol address to point to correct location
+        # with in the stack frame
+        for i, param in enumerate(reversed(self.get_symbol(name).params)):
+            param.addr = i
+            if param.direction == 'out':
+                param.indirect = True
+
+        self.gen.comment("statements")
         self.statements()
 
-        label = self.gen.new_label(name+'_end')
-        self.gen.put_label(label)
+        self.gen.comment("returning")
 
         # pop the return address off the stack and goto it
         reg = self.gen.pop_stack()
@@ -317,7 +330,7 @@ class Parser:
             self.error("expected 'procedure' but found '%s'" % self.token.value)
 
         # extra new line after each function block
-        self.gen.write("")
+        self.gen.write("", indent="")
 
 
     def procedure_header(self, is_global):
@@ -371,7 +384,6 @@ class Parser:
             with self.resync((',',')')):
                 param = self.parameter()
                 params.append(param)
-                self.add_symbol(param)
 
             if not self.match(Tokens.SYMBOL, ','):
                 break
@@ -457,6 +469,7 @@ class Parser:
                         | <procedure_call>
                         | <return_statement>
         """
+        self.gen.comment("statement")
         if self.if_statement():         return
         if self.loop_statement():       return
         if self.procedure_call():       return
@@ -517,6 +530,8 @@ class Parser:
         if not self.match(Tokens.SYMBOL, '('):
             self.error("expected '('")
 
+        self.gen.comment("calling %s" % name)
+
         args = self.argument_list(name)
 
         if not self.match(Tokens.SYMBOL, ')'):
@@ -531,12 +546,10 @@ class Parser:
 
         # push the addresses of all arguments onto the stack
         for i, (addr, _) in enumerate(args):
-            # if this argument will be changed by the function we need to pass its address, not its value
-            if self.get_symbol(name).params[i].direction == 'out':
-                addr = self.gen.set_new_reg(addr)
             self.gen.push_stack(addr)
 
-        print "[DEBUG] going to function %s with label %s" % (name, self.get_symbol(name).label)
+        #self.gen.increment_fp(len(args)+
+
         self.gen.goto_label(self.get_symbol(name).label)
         self.gen.put_label(return_label)
 
@@ -556,7 +569,24 @@ class Parser:
 
             with self.resync([',', ')', '\n']):
 
-                exp_addr, exp_type = self.expression()
+                direction = self.get_symbol(procedure_name).params[argument_idx].direction
+
+                if direction == 'in':
+                    exp_addr, exp_type = self.expression()
+                else:
+                    if not self.match(Tokens.IDENTIFIER):
+                        raise ParseError("expected out parameter to be an identifier")
+                    name = self.matched_token.value
+                    if name not in self.cur_symbols():
+                        raise ParseError("undefined identifier", token=self.prev_token)
+
+                    # if its not global we need to return the address relative to our current frame pointer
+                    if not self.get_symbol(name).isglobal:
+                        exp_addr = self.gen.set_new_reg("FP - %s" % self.get_symbol(name).addr)
+                    else:
+                        exp_addr = self.gen.set_new_reg("%s" % self.get_symbol(name).addr)
+
+                    exp_type = self.get_symbol(name).type
 
                 arguments.append((exp_addr, exp_type))
 
@@ -568,6 +598,7 @@ class Parser:
                     self.error("argument type miss-match. expected '%s' but found '%s'" % (expected_type, exp_type), self.prev_token)
 
                 argument_idx += 1
+                # TODO: check number of arguments match
 
             if not self.match(Tokens.SYMBOL, ','):
                 break
@@ -601,7 +632,10 @@ class Parser:
         self.get_symbol(dest_name).current_reg = exp_addr
         self.get_symbol(dest_name).used = True
 
-        self.gen.write("M[%s] = R[%s];" % (dest_addr, exp_addr))
+        if self.get_symbol(dest_name).indirect:
+            self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=dest_addr)
+        else:
+            self.gen.move_reg_to_mem(reg=exp_addr, mem=dest_addr)
 
         return True
 
@@ -829,8 +863,10 @@ class Parser:
                 raise ParseError("undefined identifier", token=self.prev_token)
 
             # if we already have this symbol in a register we dont need to asssign a new register
+            """
             if self.get_symbol(name).current_reg:
                 return (self.get_symbol(name).current_reg, self.get_symbol(name).type)
+            """
 
             if not self.get_symbol(name).used:
                 # TODO: if it is a global variable and we are currently
@@ -838,7 +874,7 @@ class Parser:
                 # only check for non-global variables?
                 self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
 
-            addr = self.gen.set_new_reg("M[%d]" % self.get_symbol(name).addr)
+            addr = self.gen.set_new_reg("M[FP-%d]" % self.get_symbol(name).addr)
 
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)

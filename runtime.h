@@ -7,6 +7,7 @@
 extern int R[NUM_REGS];
 extern int M[MEM_SIZE];
 extern int SP;
+extern int FP;
 
 void putInteger(int);
 void putBool(int);

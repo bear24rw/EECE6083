@@ -3,8 +3,8 @@
 
 int R[NUM_REGS];
 int M[MEM_SIZE];
-int SP = MEM_SIZE;
-int FP = MEM_SIZE-1;
+int SP = 0;
+int FP = 0;
 
 void putInteger(int x)
 {

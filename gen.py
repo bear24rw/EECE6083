@@ -25,6 +25,11 @@ class Gen:
             f.write("return 0;\n")
             f.write("}\n")
 
+    def new_reg(self):
+        i = self.current_reg
+        self.current_reg += 1
+        return i
+
     def set_new_reg(self, string):
 
         i = self.current_reg
@@ -33,16 +38,17 @@ class Gen:
         return i
 
     def move_mem_to_reg(self, mem, reg):
-        self.write("R[%s] = M[FP-%s];" % (reg, mem))
+        self.write("R[%s] = M[FP+%s];" % (reg, mem))
 
     def move_reg_to_mem(self, reg, mem):
-        self.write("M[FP-%s] = R[%s];" % (mem, reg))
+        self.write("M[FP+%s] = R[%s];" % (mem, reg))
 
     def move_reg_to_mem_indirect(self, reg, mem):
         self.write("M[R[%s]] = R[%s];" % (mem, reg))
 
     def comment(self, string):
         self.write("/* %s */" % string)
+        self.write('printf("%s\\n");' % string)
 
     def add_mem(self, string):
 
@@ -65,15 +71,22 @@ class Gen:
         self.write("goto %s;" % label)
 
     def push_stack(self, register):
-        # decrement first because we want SP to point to location of
-        # last element in stack
-        self.write("SP--;")
         self.write("M[SP] = R[%s];" % register)
+        self.write("SP++;")
 
     def pop_stack(self):
         reg = self.set_new_reg("M[SP]")
-        self.write("SP++;")
+        self.write("SP--;")
         return reg
 
     def dec_sp(self, amount=1):
-        self.write("SP = SP - %d" % amount)
+        self.write("SP = SP - %d;" % amount)
+
+    def set_fp(self, addr):
+        self.write("FP = %s;" % addr)
+
+    def set_sp_to_fp(self):
+        self.write("SP = FP;")
+
+    def set_fp_to_sp(self):
+        self.write("FP = SP;")

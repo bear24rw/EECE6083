@@ -1,6 +1,8 @@
 #ifndef __RUNTIME_H__
 #define __RUNTIME_H__
 
+#include <stdio.h>
+
 #define NUM_REGS  100
 #define MEM_SIZE  100
 

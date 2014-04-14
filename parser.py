@@ -18,6 +18,7 @@ class Symbol:
         self.current_reg = None
         self.indirect = False # M[R[current_reg]]
         self.isglobal = False
+        self.isparam = False
 
     def __repr__(self):
         if self.type == 'procedure':
@@ -194,11 +195,30 @@ class Parser:
             if x.type != 'procedure':
                 self.global_addr += x.size
         else:
-            print "local %s size %s" % (x.name, x.size)
+            addr = self.local_symbols_size()
             self.symbols[-1][x.name] = x
-            self.symbols[-1][x.name].addr = self.local_addr
-            if x.type != 'procedure':
-                self.local_addr += x.size
+            self.symbols[-1][x.name].addr = addr
+
+    def local_symbols_size(self):
+        """
+        Returns the size in bytes of the local symbols
+        """
+        size = 0
+        for s in self.symbols[-1]:
+            if self.symbols[-1][s].type == 'procedure': continue
+            #if self.symbols[-1][s].isparam: continue
+            size += self.symbols[-1][s].size
+        return size
+
+    def global_symbols_size(self):
+        """
+        Returns the size in bytes of the global symbols
+        """
+        size = 0
+        for s in self.global_symbols:
+            if self.global_symbols[s].type == 'procedure': continue
+            size += self.global_symbols[s].size
+        return size
 
     def get_symbol(self, x):
         if x in self.global_symbols:
@@ -238,8 +258,14 @@ class Parser:
 
         self.gen.put_label("main")
 
+        self.gen.comment("starting fp at top of global vars")
+        self.gen.set_fp(self.global_symbols_size())
+
+        self.gen.comment("resetting sp to fp")
+        self.gen.set_sp_to_fp()
+
         self.gen.comment("moving sp to top of local vars")
-        self.gen.dec_sp(self.local_addr)
+        self.gen.dec_sp(self.local_symbols_size())
 
         self.statements()
 
@@ -307,13 +333,17 @@ class Parser:
         self.gen.put_label(label)
         self.get_symbol(name).label = label
 
-        self.gen.comment("moving sp to top of local vars")
-        self.gen.dec_sp(self.local_addr)
+        #self.gen.comment("setting fp")
+        #self.gen.set_fp_to_sp()
+
+        if self.local_symbols_size() > 0:
+            self.gen.comment("moving sp to top of local vars")
+            self.gen.dec_sp(self.local_symbols_size())
 
         # map parameter symbol address to point to correct location
         # with in the stack frame
         for i, param in enumerate(reversed(self.get_symbol(name).params)):
-            param.addr = i
+            #param.addr = i
             if param.direction == 'out':
                 param.indirect = True
 
@@ -322,9 +352,16 @@ class Parser:
 
         self.gen.comment("returning")
 
-        # pop the return address off the stack and goto it
-        reg = self.gen.pop_stack()
-        self.gen.write("goto *(void *)R[%s];" % reg)
+        self.gen.comment("getting return address")
+        return_reg = self.gen.set_new_reg("M[FP-2];")
+
+        self.gen.comment("restore previous fp")
+        self.gen.set_fp("M[FP-1];")
+
+        self.gen.comment("restore previous sp")
+        self.gen.set_sp_to_fp()
+
+        self.gen.write("goto *(void *)R[%s];" % return_reg)
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -396,6 +433,7 @@ class Parser:
         """
 
         symbol = self.variable_declaration()
+        symbol.isparam = True
 
         if self.token.type != Tokens.KEYWORD:
             raise ParseError("expected keyword 'in' or 'out'", self.token)
@@ -544,6 +582,13 @@ class Parser:
         reg = self.gen.set_new_reg("(int)&&%s" % return_label)
         self.gen.push_stack(reg)
 
+        # push current frame pointer onto the stack
+        reg = self.gen.set_new_reg("FP")
+        self.gen.push_stack(reg)
+
+        # new frame for this call
+        self.gen.set_fp_to_sp()
+
         # push the addresses of all arguments onto the stack
         for i, (addr, _) in enumerate(args):
             self.gen.push_stack(addr)
@@ -582,7 +627,7 @@ class Parser:
 
                     # if its not global we need to return the address relative to our current frame pointer
                     if not self.get_symbol(name).isglobal:
-                        exp_addr = self.gen.set_new_reg("FP - %s" % self.get_symbol(name).addr)
+                        exp_addr = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)
                     else:
                         exp_addr = self.gen.set_new_reg("%s" % self.get_symbol(name).addr)
 
@@ -633,7 +678,9 @@ class Parser:
         self.get_symbol(dest_name).used = True
 
         if self.get_symbol(dest_name).indirect:
-            self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=dest_addr)
+            r = self.gen.new_reg()
+            self.gen.move_mem_to_reg(mem=dest_addr, reg=r)
+            self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=r)
         else:
             self.gen.move_reg_to_mem(reg=exp_addr, mem=dest_addr)
 
@@ -874,7 +921,7 @@ class Parser:
                 # only check for non-global variables?
                 self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
 
-            addr = self.gen.set_new_reg("M[FP-%d]" % self.get_symbol(name).addr)
+            addr = self.gen.set_new_reg("M[FP+%d]" % self.get_symbol(name).addr)
 
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)

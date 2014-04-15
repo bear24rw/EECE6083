@@ -350,19 +350,7 @@ class Parser:
         self.gen.comment("statements")
         self.statements()
 
-        self.gen.comment("returning")
-
-        self.gen.comment("getting return address")
-        return_reg = self.gen.set_new_reg("M[FP-2];")
-
-        self.gen.comment("restore previous fp")
-        self.gen.set_fp("M[FP-1];")
-
-        self.gen.comment("restore previous sp")
-        #self.gen.set_sp_to_fp()
-        self.gen.write("SP = FP + 1;")
-
-        self.gen.write("goto *(void *)R[%s];" % return_reg)
+        self.gen.return_to_caller()
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -537,7 +525,10 @@ class Parser:
         <return_statement> ::= return
         """
 
-        return self.match(Tokens.KEYWORD, "return")
+        if not self.match(Tokens.KEYWORD, "return"):
+            return False
+
+        self.gen.return_to_caller()
 
     def procedure_call(self):
         """

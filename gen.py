@@ -93,3 +93,18 @@ class Gen:
 
     def set_fp_to_sp(self):
         self.write("FP = SP;")
+
+    def return_to_caller(self):
+        self.comment("returning")
+
+        self.comment("getting return address")
+        return_reg = self.set_new_reg("M[FP-2];")
+
+        self.comment("restore previous fp")
+        self.set_fp("M[FP-1];")
+
+        self.comment("restore previous sp")
+        self.write("SP = FP + 1;")
+
+        self.write("goto *(void *)R[%s];" % return_reg)
+

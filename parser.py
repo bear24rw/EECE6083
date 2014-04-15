@@ -572,6 +572,7 @@ class Parser:
         self.gen.comment("calling %s" % name)
 
         args = self.argument_list(name)
+        self.gen.comment("args: %s" % args)
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' after argument list")
@@ -922,7 +923,10 @@ class Parser:
                 # only check for non-global variables?
                 self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
 
-            addr = self.gen.set_new_reg("M[FP+%d]" % self.get_symbol(name).addr)
+            if self.get_symbol(name).isglobal:
+                addr = self.gen.set_new_reg("M[%d]" % self.get_symbol(name).addr)
+            else:
+                addr = self.gen.set_new_reg("M[FP+%d]" % self.get_symbol(name).addr)
 
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)

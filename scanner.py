@@ -72,7 +72,7 @@ class Scanner:
                     continue
 
                 # if its a newline insert a special token and then skip it
-                if char == '\n':
+                if char in ['\n','\r']:
                     yield Tokens.Token(self, Tokens.SPECIAL, '\n')
                     continue
 
@@ -199,7 +199,7 @@ class Scanner:
                         token.value += next_char
                         char, next_char = next(col_iter)
 
-                    if next_char == '\n':
+                    if next_char in ['\n','\r']:
                         self.error("unexpected EOL while scanning string literal", column=self.col_num+1)
                         yield Tokens.Token(self, Tokens.INVALID)
                         break
@@ -216,7 +216,7 @@ class Scanner:
 
                     continue
 
-                self.error("unsupported character '%s'" % char)
+                self.error("unsupported character %r" % char)
                 yield Tokens.Token(self, Tokens.INVALID)
 
         # return an EOF token since we are done

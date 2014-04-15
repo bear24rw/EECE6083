@@ -529,6 +529,7 @@ class Parser:
             return False
 
         self.gen.return_to_caller()
+        return True
 
     def procedure_call(self):
         """

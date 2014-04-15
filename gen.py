@@ -82,6 +82,9 @@ class Gen:
     def dec_sp(self, amount=1):
         self.write("SP = SP - %d;" % amount)
 
+    def inc_sp(self, amount=1):
+        self.write("SP = SP + %d;" % amount)
+
     def set_fp(self, addr):
         self.write("FP = %s;" % addr)
 

@@ -265,7 +265,7 @@ class Parser:
         self.gen.set_sp_to_fp()
 
         self.gen.comment("moving sp to top of local vars")
-        self.gen.dec_sp(self.local_symbols_size())
+        self.gen.inc_sp(self.local_symbols_size())
 
         self.statements()
 
@@ -338,7 +338,7 @@ class Parser:
 
         if self.local_symbols_size() > 0:
             self.gen.comment("moving sp to top of local vars")
-            self.gen.dec_sp(self.local_symbols_size())
+            self.gen.inc_sp(self.local_symbols_size())
 
         # map parameter symbol address to point to correct location
         # with in the stack frame

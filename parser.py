@@ -359,7 +359,8 @@ class Parser:
         self.gen.set_fp("M[FP-1];")
 
         self.gen.comment("restore previous sp")
-        self.gen.set_sp_to_fp()
+        #self.gen.set_sp_to_fp()
+        self.gen.write("SP = FP + 1;")
 
         self.gen.write("goto *(void *)R[%s];" % return_reg)
 

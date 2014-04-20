@@ -1,5 +1,5 @@
 putinteger:
-    R[0] = M[FP];
+    R[0] = M[FP-1];
     putInteger(R[0]);
     R[0] = M[FP-2];
     FP = M[FP-1];

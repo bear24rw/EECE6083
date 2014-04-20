@@ -40,6 +40,9 @@ class Gen:
     def move_mem_to_reg(self, mem, reg):
         self.write("R[%s] = M[FP+%s];" % (reg, mem))
 
+    def move_reg_to_mem_global(self, reg, mem):
+        self.write("M[%s] = R[%s];" % (mem, reg))
+
     def move_reg_to_mem(self, reg, mem):
         self.write("M[FP+%s] = R[%s];" % (mem, reg))
 

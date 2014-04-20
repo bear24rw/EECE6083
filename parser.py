@@ -496,7 +496,7 @@ class Parser:
                         | <procedure_call>
                         | <return_statement>
         """
-        self.gen.comment("statement")
+        self.gen.comment("statement: %s" % self.token.line_str.strip())
         if self.if_statement():         return
         if self.loop_statement():       return
         if self.procedure_call():       return
@@ -670,6 +670,10 @@ class Parser:
 
         self.get_symbol(dest_name).current_reg = exp_addr
         self.get_symbol(dest_name).used = True
+
+        if self.get_symbol(dest_name).isglobal:
+            self.gen.move_reg_to_mem_global(exp_addr, dest_addr)
+            return True
 
         if self.get_symbol(dest_name).indirect:
             r = self.gen.new_reg()

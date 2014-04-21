@@ -51,7 +51,7 @@ class Gen:
 
     def comment(self, string):
         self.write("/* %s */" % string)
-        self.write('printf("%s\\n");' % string)
+        #self.write('printf("%s\\n");' % string)
 
     def add_mem(self, string):
 

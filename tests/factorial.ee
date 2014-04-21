@@ -1,0 +1,18 @@
+program factorial is
+    integer a;
+    global integer result;
+    global procedure factorial(integer x in, integer z out)
+    integer y;
+    begin
+        if (x == 0) then
+            z := 1;
+        else
+            factorial(x-1, y);
+            z := x * y;
+        end if;
+    end procedure;
+begin
+    a := 10;
+    factorial(a, result);
+    putInteger(result);
+end program;

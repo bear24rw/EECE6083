@@ -621,7 +621,7 @@ class Parser:
                         raise ParseError("undefined identifier", token=self.prev_token)
 
                     # if its not global we need to return the address relative to our current frame pointer
-                    if self.get_symbol(name).direction == 'out':
+                    if self.get_symbol(name).isparam and self.get_symbol(name).direction == 'out':
                         exp_addr = self.gen.set_new_reg("M[FP+%s]" % self.get_symbol(name).addr)
                     elif not self.get_symbol(name).isglobal:
                         exp_addr = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)

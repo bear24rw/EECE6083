@@ -24,6 +24,6 @@ program test_program is
     end procedure;
 begin
     fibb_result := -1234;
-    fibb(10, fibb_result);
+    fibb(9, fibb_result);
     putInteger(fibb_result);
 end program

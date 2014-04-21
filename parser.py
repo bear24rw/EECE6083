@@ -581,7 +581,6 @@ class Parser:
         # push current frame pointer onto the stack
         reg = self.gen.set_new_reg("FP")
         self.gen.push_stack(reg)
-        self.gen.write('printf("pushing FP: %d\\n", FP);')
 
         # new frame for this call
         self.gen.set_fp_to_sp()
@@ -682,7 +681,6 @@ class Parser:
 
         if self.get_symbol(dest_name).indirect:
             r = self.gen.new_reg()
-            self.gen.write('printf("putting %r addr: %r result in R[%s]\\n");' % (dest_name, self.get_symbol(dest_name).addr, r))
             self.gen.move_mem_to_reg(mem=dest_addr, reg=r)
             self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=r)
         else:

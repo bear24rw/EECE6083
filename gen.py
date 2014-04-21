@@ -104,7 +104,6 @@ class Gen:
         return_reg = self.set_new_reg("M[FP-2];")
 
         self.comment("restore previous fp")
-        self.write('printf("restoring FP: %d\\n", M[FP-1]);')
         self.set_fp("M[FP-1];")
 
         self.comment("restore previous sp")

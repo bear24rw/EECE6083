@@ -8,7 +8,7 @@ int FP = 0;
 
 void putInteger(int x)
 {
-    printf("%d", x);
+    printf("%d\n", x);
 }
 
 void putBool(int x)

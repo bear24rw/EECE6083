@@ -623,10 +623,10 @@ class Parser:
                     # if its not global we need to return the address relative to our current frame pointer
                     if self.get_symbol(name).isparam and self.get_symbol(name).direction == 'out':
                         exp_addr = self.gen.set_new_reg("M[FP+%s]" % self.get_symbol(name).addr)
-                    elif not self.get_symbol(name).isglobal:
-                        exp_addr = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)
+                    elif self.get_symbol(name).isglobal:
+                        exp_addr = self.gen.set_new_reg("M[%s]" % self.get_symbol(name).addr)
                     else:
-                        exp_addr = self.gen.set_new_reg("%s" % self.get_symbol(name).addr)
+                        exp_addr = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)
 
                     exp_type = self.get_symbol(name).type
 

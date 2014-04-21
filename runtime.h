@@ -3,8 +3,8 @@
 
 #include <stdio.h>
 
-#define NUM_REGS  100
-#define MEM_SIZE  100
+#define NUM_REGS  10000
+#define MEM_SIZE  10000
 
 extern int R[NUM_REGS];
 extern int M[MEM_SIZE];

@@ -49,6 +49,7 @@ class Parser:
         self.symbols = [{}]
         self.global_addr = 0    # absolute address = global_addr
         self.local_addr = 0     # absolute address = FP + local_addr
+        self.current_procedure = None # symbol name of current procedure
 
         self.gen = gen
         self.scanner = scanner
@@ -226,7 +227,7 @@ class Parser:
         elif x in self.symbols[-1]:
             return self.symbols[-1][x]
         else:
-            raise ParseError("Tried to lookup unknown symbol")
+            raise ParseError("Tried to lookup unknown symbol: %r" % x)
 
     def program(self):
         """
@@ -313,6 +314,7 @@ class Parser:
         name = self.procedure_header(is_global)
         if not name:
             return False
+        self.current_procedure = name
         self.procedure_body(name)
         self.exit_scope()
         return True
@@ -350,7 +352,7 @@ class Parser:
         self.gen.comment("statements")
         self.statements()
 
-        self.gen.return_to_caller()
+        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params)
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -528,7 +530,7 @@ class Parser:
         if not self.match(Tokens.KEYWORD, "return"):
             return False
 
-        self.gen.return_to_caller()
+        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params)
         return True
 
     def procedure_call(self):
@@ -680,7 +682,7 @@ class Parser:
 
         if self.get_symbol(dest_name).indirect:
             r = self.gen.new_reg()
-            self.gen.write('printf("putting result in R[%s]\\n");' % r)
+            self.gen.write('printf("putting %r addr: %r result in R[%s]\\n");' % (dest_name, self.get_symbol(dest_name).addr, r))
             self.gen.move_mem_to_reg(mem=dest_addr, reg=r)
             self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=r)
         else:

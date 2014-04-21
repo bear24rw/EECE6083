@@ -579,6 +579,7 @@ class Parser:
         # push current frame pointer onto the stack
         reg = self.gen.set_new_reg("FP")
         self.gen.push_stack(reg)
+        self.gen.write('printf("pushing FP: %d\\n", FP);')
 
         # new frame for this call
         self.gen.set_fp_to_sp()
@@ -620,7 +621,9 @@ class Parser:
                         raise ParseError("undefined identifier", token=self.prev_token)
 
                     # if its not global we need to return the address relative to our current frame pointer
-                    if not self.get_symbol(name).isglobal:
+                    if self.get_symbol(name).direction == 'out':
+                        exp_addr = self.gen.set_new_reg("M[FP+%s]" % self.get_symbol(name).addr)
+                    elif not self.get_symbol(name).isglobal:
                         exp_addr = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)
                     else:
                         exp_addr = self.gen.set_new_reg("%s" % self.get_symbol(name).addr)
@@ -677,6 +680,7 @@ class Parser:
 
         if self.get_symbol(dest_name).indirect:
             r = self.gen.new_reg()
+            self.gen.write('printf("putting result in R[%s]\\n");' % r)
             self.gen.move_mem_to_reg(mem=dest_addr, reg=r)
             self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=r)
         else:

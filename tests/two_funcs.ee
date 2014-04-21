@@ -1,0 +1,17 @@
+program add_func is
+    global integer result;
+
+    global procedure two(integer x in, integer z out)
+    begin
+        z := 42;
+    end procedure;
+
+    global procedure one(integer x in, integer z out)
+    begin
+        two(x, z);
+    end procedure;
+
+begin
+    one(5, result);
+    putInteger(result);
+end program;

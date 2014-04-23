@@ -210,7 +210,10 @@ class Parser:
             if self.symbols[-1][s].type == 'procedure': continue
             if not self.symbols[-1][s].isparam: continue
             #if self.symbols[-1][s].isparam: continue
-            size += self.symbols[-1][s].size
+            if self.symbols[-1][s].direction == 'out':
+                size += 1
+            else:
+                size += self.symbols[-1][s].size
         return size
 
     def local_symbols_size(self):

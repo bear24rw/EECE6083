@@ -19,6 +19,7 @@ class Symbol:
         self.indirect = False # M[R[current_reg]]
         self.isglobal = False
         self.isparam = False
+        self.isarray = False
 
     def __repr__(self):
         if self.type == 'procedure':
@@ -196,9 +197,21 @@ class Parser:
             if x.type != 'procedure':
                 self.global_addr += x.size
         else:
-            addr = self.local_symbols_size()
+            addr = self.local_symbols_size() + self.local_param_size()
             self.symbols[-1][x.name] = x
             self.symbols[-1][x.name].addr = addr
+
+    def local_param_size(self):
+        """
+        Returns the size in byte of the local paramters
+        """
+        size = 0
+        for s in self.symbols[-1]:
+            if self.symbols[-1][s].type == 'procedure': continue
+            if not self.symbols[-1][s].isparam: continue
+            #if self.symbols[-1][s].isparam: continue
+            size += self.symbols[-1][s].size
+        return size
 
     def local_symbols_size(self):
         """
@@ -207,6 +220,7 @@ class Parser:
         size = 0
         for s in self.symbols[-1]:
             if self.symbols[-1][s].type == 'procedure': continue
+            if self.symbols[-1][s].isparam: continue
             #if self.symbols[-1][s].isparam: continue
             size += self.symbols[-1][s].size
         return size
@@ -338,6 +352,10 @@ class Parser:
         #self.gen.comment("setting fp")
         #self.gen.set_fp_to_sp()
 
+        if self.local_param_size() > 0:
+            self.gen.comment("moving sp to top of paramters")
+            self.gen.inc_sp(self.local_param_size())
+
         if self.local_symbols_size() > 0:
             self.gen.comment("moving sp to top of local vars")
             self.gen.inc_sp(self.local_symbols_size())
@@ -352,7 +370,7 @@ class Parser:
         self.gen.comment("statements")
         self.statements()
 
-        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params)
+        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params, self.local_symbols_size())
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -461,8 +479,11 @@ class Parser:
             raise ParseError("duplicate declaration of '%s'" % name, self.prev_token)
 
         size = 1
+        isarray = False
 
         if self.match(Tokens.SYMBOL, '['):
+
+            isarray = True
 
             size = self.match(Tokens.INTEGER)
 
@@ -475,7 +496,10 @@ class Parser:
             if not self.match(Tokens.SYMBOL, ']'):
                 raise ParseError("expected closing ']'")
 
+            size = int(size)
+
         symbol = Symbol(name, typemark, size=size)
+        symbol.isarray = isarray
         self.add_symbol(symbol, is_global)
 
         return symbol
@@ -530,7 +554,7 @@ class Parser:
         if not self.match(Tokens.KEYWORD, "return"):
             return False
 
-        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params)
+        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params, self.local_symbols_size())
         return True
 
     def procedure_call(self):
@@ -566,7 +590,6 @@ class Parser:
         self.gen.comment("calling %s" % name)
 
         args = self.argument_list(name)
-        self.gen.comment("args: %s" % args)
 
         if not self.match(Tokens.SYMBOL, ')'):
             self.error("expected ')' after argument list")
@@ -575,10 +598,12 @@ class Parser:
         return_label = self.gen.new_label("return_from_%s" % name)
 
         # push return address onto the stack
+        self.gen.comment("pushing return address onto stack")
         reg = self.gen.set_new_reg("(int)&&%s" % return_label)
         self.gen.push_stack(reg)
 
         # push current frame pointer onto the stack
+        self.gen.comment("pushing current FP onto stack")
         reg = self.gen.set_new_reg("FP")
         self.gen.push_stack(reg)
 
@@ -586,6 +611,7 @@ class Parser:
         self.gen.set_fp_to_sp()
 
         # push the addresses of all arguments onto the stack
+        self.gen.comment("pushing args onto stack")
         for i, (addr, _) in enumerate(args):
             self.gen.push_stack(addr)
 
@@ -613,7 +639,29 @@ class Parser:
                 direction = self.get_symbol(procedure_name).params[argument_idx].direction
 
                 if direction == 'in':
+                    """
+                    check if argument is an array or an expression
+                    """
+                    name = self.token.value
+                    tok_type = self.token.type
+
                     exp_addr, exp_type = self.expression()
+
+                    if exp_addr is None:
+                        if tok_type == Tokens.IDENTIFIER and self.get_symbol(name).isarray:
+                            self.gen.comment("Loading array '%s' into registers" % name)
+                            for i in range(self.get_symbol(name).size):
+                                if self.get_symbol(name).isglobal:
+                                    r = self.gen.set_new_reg("M[%s+%s]" % (self.get_symbol(name).addr, i))
+                                else:
+                                    r = self.gen.set_new_reg("M[FP+%s+%s]" % (self.get_symbol(name).addr, i))
+                                arguments.append((r, self.token.type))
+                            exp_type = self.get_symbol(name).type
+                        else:
+                            raise ParseError("expected array indentifier or expression")
+                    else:
+                        self.gen.comment("Loaded expression into register")
+                        arguments.append((exp_addr, exp_type))
                 else:
                     if not self.match(Tokens.IDENTIFIER):
                         raise ParseError("expected out parameter to be an identifier")
@@ -621,6 +669,7 @@ class Parser:
                     if name not in self.cur_symbols():
                         raise ParseError("undefined identifier", token=self.prev_token)
 
+                    self.gen.comment("Loading %s onto stack" % name)
                     # if its not global we need to return the address relative to our current frame pointer
                     if self.get_symbol(name).isparam and self.get_symbol(name).direction == 'out':
                         exp_addr = self.gen.set_new_reg("M[FP+%s]" % self.get_symbol(name).addr)
@@ -631,10 +680,7 @@ class Parser:
 
                     exp_type = self.get_symbol(name).type
 
-                arguments.append((exp_addr, exp_type))
-
-                if exp_addr is None:
-                    raise ParseError("invalid expression")
+                    arguments.append((exp_addr, exp_type))
 
                 expected_type = self.get_symbol(procedure_name).params[argument_idx].type
                 if exp_type != expected_type:
@@ -653,7 +699,7 @@ class Parser:
         <assignment_statement> ::= <destination> := <expression>
         """
 
-        dest_name, dest_addr, dest_type = self.destination()
+        dest_name, dest_addr, offset_reg, dest_type = self.destination()
 
         # if the next token is not an assignment operator we are
         # not doing an assignment so just return
@@ -676,15 +722,15 @@ class Parser:
         self.get_symbol(dest_name).used = True
 
         if self.get_symbol(dest_name).isglobal:
-            self.gen.move_reg_to_mem_global(exp_addr, dest_addr)
+            self.gen.move_reg_to_mem_global(exp_addr, dest_addr, offset_reg=offset_reg)
             return True
 
         if self.get_symbol(dest_name).indirect:
             r = self.gen.new_reg()
-            self.gen.move_mem_to_reg(mem=dest_addr, reg=r)
+            self.gen.move_mem_to_reg(mem=dest_addr, reg=r, offset_reg=offset_reg)
             self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=r)
         else:
-            self.gen.move_reg_to_mem(reg=exp_addr, mem=dest_addr)
+            self.gen.move_reg_to_mem(reg=exp_addr, mem=dest_addr, offset_reg=offset_reg)
 
         return True
 
@@ -797,12 +843,25 @@ class Parser:
         """
         # TODO: return the symbol object
 
+        name_token = self.token
         name = self.match(Tokens.IDENTIFIER)
 
         if name not in self.cur_symbols():
-            return (name, None, None)
+            return (name, None, None, None)
 
-        return (name, self.get_symbol(name).addr, self.get_symbol(name).type)
+        offset_addr = None
+
+        if self.match(Tokens.SYMBOL, '['):
+
+            if not self.get_symbol(name).isarray:
+                raise ParseError("'%s' is not an array" % name, name_token)
+
+            offset_addr, type = self.expression()
+
+            if not self.match(Tokens.SYMBOL, ']'):
+                raise ParseError("expected closing ']'")
+
+        return (name, self.get_symbol(name).addr, offset_addr, self.get_symbol(name).type)
 
     def operation(self, lhs, operations, rhs, result_is_bool=False):
         """
@@ -890,6 +949,10 @@ class Parser:
         Returns a tuple: (register_addr, type)
         """
 
+        """
+        Expressions
+        """
+
         if self.match(Tokens.SYMBOL, '('):
             addr, type = self.expression()
             if not self.match(Tokens.SYMBOL, ')'):
@@ -902,39 +965,10 @@ class Parser:
             negate = False
 
         """
-        Identifiers
+        Name
         """
         if self.match(Tokens.IDENTIFIER):
-
-            name = self.matched_token.value
-
-            if name not in self.cur_symbols():
-                raise ParseError("undefined identifier", token=self.prev_token)
-
-            # if we already have this symbol in a register we dont need to asssign a new register
-            """
-            if self.get_symbol(name).current_reg:
-                return (self.get_symbol(name).current_reg, self.get_symbol(name).type)
-            """
-
-            if not self.get_symbol(name).used:
-                # TODO: if it is a global variable and we are currently
-                # processing a procedure than this false triggers. Maybe
-                # only check for non-global variables?
-                self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
-
-            if self.get_symbol(name).isglobal:
-                addr = self.gen.set_new_reg("M[%d]" % self.get_symbol(name).addr)
-            else:
-                addr = self.gen.set_new_reg("M[FP+%d]" % self.get_symbol(name).addr)
-
-            if negate:
-                addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
-
-            # keep track of what register contains this symbols value
-            self.get_symbol(name).current_reg = addr
-
-            return (addr, self.get_symbol(name).type)
+            return self.name(negate)
 
         """
         Numbers
@@ -963,11 +997,61 @@ class Parser:
 
         raise ParseError("expected factor but found '%s'" % self.token.value)
 
-    def name(self):
+    def name(self, negate):
         """
         <name> ::= <identifier>[[<expression>]]
         """
-        pass
+
+        name = self.matched_token.value
+
+        if name not in self.cur_symbols():
+            raise ParseError("undefined identifier", token=self.prev_token)
+
+        # if we already have this symbol in a register we dont need to asssign a new register
+        """
+        if self.get_symbol(name).current_reg:
+            return (self.get_symbol(name).current_reg, self.get_symbol(name).type)
+        """
+
+        if not self.get_symbol(name).used:
+            # TODO: if it is a global variable and we are currently
+            # processing a procedure than this false triggers. Maybe
+            # only check for non-global variables?
+            self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
+
+        offset_reg = None
+
+        if self.match(Tokens.SYMBOL, '['):
+
+            if not self.get_symbol(name).isarray:
+                raise ParseError("'%s' is not an array" % name, name_token)
+
+            self.gen.comment("getting array '%s' offset" % name)
+            offset_reg, type = self.expression()
+
+            if not self.match(Tokens.SYMBOL, ']'):
+                raise ParseError("expected closing ']'")
+        elif self.get_symbol(name).isarray:
+            return (None, None)
+
+        if self.get_symbol(name).isglobal:
+            if offset_reg:
+                addr = self.gen.set_new_reg("M[%d+R[%s]]" % (self.get_symbol(name).addr, offset_reg))
+            else:
+                addr = self.gen.set_new_reg("M[%d]" % self.get_symbol(name).addr)
+        else:
+            if offset_reg:
+                addr = self.gen.set_new_reg("M[FP+%d+R[%s]]" % (self.get_symbol(name).addr, offset_reg))
+            else:
+                addr = self.gen.set_new_reg("M[FP+%d]" % self.get_symbol(name).addr)
+
+        if negate:
+            addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
+
+        # keep track of what register contains this symbols value
+        self.get_symbol(name).current_reg = addr
+
+        return (addr, self.get_symbol(name).type)
 
 
 if __name__ == "__main__":

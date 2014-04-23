@@ -352,10 +352,6 @@ class Parser:
         #self.gen.comment("setting fp")
         #self.gen.set_fp_to_sp()
 
-        if self.local_param_size() > 0:
-            self.gen.comment("moving sp to top of paramters")
-            self.gen.inc_sp(self.local_param_size())
-
         if self.local_symbols_size() > 0:
             self.gen.comment("moving sp to top of local vars")
             self.gen.inc_sp(self.local_symbols_size())

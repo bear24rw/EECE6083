@@ -369,7 +369,7 @@ class Parser:
         self.gen.comment("statements")
         self.statements()
 
-        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params, self.local_symbols_size())
+        self.gen.return_to_caller(self.local_param_size(), self.local_symbols_size())
 
         if not self.match(Tokens.KEYWORD, "procedure"):
             self.error("expected 'procedure' but found '%s'" % self.token.value)
@@ -553,7 +553,7 @@ class Parser:
         if not self.match(Tokens.KEYWORD, "return"):
             return False
 
-        self.gen.return_to_caller(self.get_symbol(self.current_procedure).params, self.local_symbols_size())
+        self.gen.return_to_caller(self.local_param_size(), self.local_symbols_size())
         return True
 
     def procedure_call(self):
@@ -725,8 +725,9 @@ class Parser:
             return True
 
         if self.get_symbol(dest_name).indirect:
-            r = self.gen.new_reg()
-            self.gen.move_mem_to_reg(mem=dest_addr, reg=r, offset_reg=offset_reg)
+            r = self.gen.set_new_reg("M[FP + %d]" % dest_addr)
+            if offset_reg:
+                r = self.gen.set_new_reg("R[%d] + R[%d]" % (r, offset_reg))
             self.gen.move_reg_to_mem_indirect(reg=exp_addr, mem=r)
         else:
             self.gen.move_reg_to_mem(reg=exp_addr, mem=dest_addr, offset_reg=offset_reg)
@@ -1040,7 +1041,10 @@ class Parser:
                 addr = self.gen.set_new_reg("M[%d]" % self.get_symbol(name).addr)
         else:
             if offset_reg:
-                addr = self.gen.set_new_reg("M[FP+%d+R[%s]]" % (self.get_symbol(name).addr, offset_reg))
+                if self.get_symbol(name).indirect:
+                    addr = self.gen.set_new_reg("M[M[FP+%d]+R[%s]]" % (self.get_symbol(name).addr, offset_reg))
+                else:
+                    addr = self.gen.set_new_reg("M[FP+%d+R[%s]]" % (self.get_symbol(name).addr, offset_reg))
             else:
                 addr = self.gen.set_new_reg("M[FP+%d]" % self.get_symbol(name).addr)
 

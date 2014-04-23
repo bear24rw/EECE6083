@@ -109,7 +109,7 @@ class Gen:
     def set_fp_to_sp(self):
         self.write("FP = SP;")
 
-    def return_to_caller(self, params, local_size):
+    def return_to_caller(self, param_size, local_size):
         self.comment("returning")
 
         self.comment("getting return address")
@@ -122,8 +122,7 @@ class Gen:
         self.write("SP = SP - %s;" % local_size)
 
         self.comment("cleaning up argument stack")
-        size = sum([s.size for s in params])
-        self.write("SP = SP - %s;" % size)
+        self.write("SP = SP - %s;" % param_size)
 
         self.comment("cleaning up return addr and old FP")
         self.write("SP = SP - 2;")

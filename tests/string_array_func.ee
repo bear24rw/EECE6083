@@ -1,0 +1,17 @@
+program test_program_array is
+    string names[3];
+    procedure print_names(string names[3] in)
+        integer i;
+    begin
+        i := -1;
+        for (i := i + 1; i < 3)
+            putString(names[i]);
+            putString(" ");
+        end for;
+    end procedure;
+begin
+    names[0] := "max";
+    names[1] := "tom";
+    names[2] := "samir";
+    print_names(names);
+end program

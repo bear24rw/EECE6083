@@ -1,0 +1,15 @@
+program print_array is
+    integer a[5];
+    integer i;
+begin
+    i := -1;
+    for (i := i + 1; i < 5)
+        a[i] := i * i;
+    end for;
+
+    i := -1;
+    for (i := i + 1; i < 5)
+        putInteger(a[i]);
+    end for;
+
+end program;

@@ -66,6 +66,10 @@ class Parser:
         self.global_symbols['putbool'].type = 'procedure'
         self.global_symbols['putbool'].params.append(Symbol(type="BOOL", direction="in"))
 
+        self.global_symbols['putstring'] = Symbol('putstring')
+        self.global_symbols['putstring'].type = 'procedure'
+        self.global_symbols['putstring'].params.append(Symbol(type="STRING", direction="in"))
+
     def warning(self, message, token=None):
 
         self.print_message(message, label="warning", token=token, color=Color.YELLOW)
@@ -982,7 +986,21 @@ class Parser:
         """
         String
         """
-        if self.match(Tokens.STRING): return self.matched_token
+        if self.match(Tokens.STRING):
+            symbol = Symbol(self.matched_token.value, self.matched_token.type, len(self.matched_token.value)+1)
+            symbol.isarray = True
+            self.add_symbol(symbol)
+
+            for i,c in enumerate(self.matched_token.value):
+                self.gen.write("M[FP+%s] = '%s';" % (symbol.addr+i,c))
+
+            self.gen.write("M[FP+%s] = '\\0';" % (symbol.addr+i+1))
+
+            self.gen.write("SP = SP + %d;" % symbol.size)
+
+            r = self.gen.set_new_reg("FP + %s" % symbol.addr)
+
+            return (r, self.matched_token.type)
 
         """
         Bool

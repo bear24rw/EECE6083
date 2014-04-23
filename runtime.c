@@ -8,10 +8,15 @@ int FP = 0;
 
 void putInteger(int x)
 {
-    printf("%d\n", x);
+    printf("%d", x);
 }
 
 void putBool(int x)
 {
     x ? printf("true") : printf("false");
+}
+
+void putString(int x)
+{
+    while (M[x]) printf("%c", M[x++]);
 }

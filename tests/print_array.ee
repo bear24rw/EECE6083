@@ -10,6 +10,7 @@ begin
     i := -1;
     for (i := i + 1; i < 5)
         putInteger(a[i]);
+        putString(" ");
     end for;
 
 end program;

@@ -82,6 +82,10 @@ class Parser:
         self.global_symbols['getbool'].type = 'procedure'
         self.global_symbols['getbool'].params.append(Symbol(type="BOOL", direction="out"))
 
+        self.global_symbols['getstring'] = Symbol('getstring')
+        self.global_symbols['getstring'].type = 'procedure'
+        self.global_symbols['getstring'].params.append(Symbol(type="STRING", direction="out"))
+
         self.global_symbols['getfloat'] = Symbol('getfloat')
         self.global_symbols['getfloat'].type = 'procedure'
         self.global_symbols['getfloat'].params.append(Symbol(type="FLOAT", direction="out"))
@@ -229,11 +233,7 @@ class Parser:
         for s in self.symbols[-1]:
             if self.symbols[-1][s].type == 'procedure': continue
             if not self.symbols[-1][s].isparam: continue
-            #if self.symbols[-1][s].isparam: continue
-            if self.symbols[-1][s].direction == 'out':
-                size += 1
-            else:
-                size += self.symbols[-1][s].size
+            size += 1
         return size
 
     def local_symbols_size(self):
@@ -385,6 +385,8 @@ class Parser:
             #param.addr = i
             if param.direction == 'out':
                 param.indirect = True
+            if param.isarray:
+                param.indirect = True
 
         self.gen.comment("statements")
         self.statements()
@@ -516,6 +518,10 @@ class Parser:
                 raise ParseError("expected closing ']'")
 
             size = int(size)
+
+        if typemark == "STRING":
+            size = 100
+            isarray = True
 
         symbol = Symbol(name, typemark, size=size)
         symbol.isarray = isarray
@@ -669,12 +675,11 @@ class Parser:
                     if exp_addr is None:
                         if tok_type == Tokens.IDENTIFIER and self.get_symbol(name).isarray:
                             self.gen.comment("Loading array '%s' into registers" % name)
-                            for i in range(self.get_symbol(name).size):
-                                if self.get_symbol(name).isglobal:
-                                    r = self.gen.set_new_reg("M[%s+%s]" % (self.get_symbol(name).addr, i))
-                                else:
-                                    r = self.gen.set_new_reg("M[FP+%s+%s]" % (self.get_symbol(name).addr, i))
-                                arguments.append((r, self.token.type))
+                            if self.get_symbol(name).isglobal:
+                                r = self.gen.set_new_reg("%s" % self.get_symbol(name).addr)
+                            else:
+                                r = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)
+                            arguments.append((r, self.token.type))
                             exp_type = self.get_symbol(name).type
                         else:
                             raise ParseError("expected array indentifier or expression")
@@ -688,7 +693,7 @@ class Parser:
                     if name not in self.cur_symbols():
                         raise ParseError("undefined identifier", token=self.prev_token)
 
-                    self.gen.comment("Loading %s onto stack" % name)
+                    self.gen.comment("Loading %s into register" % name)
                     # if its not global we need to return the address relative to our current frame pointer
                     if self.get_symbol(name).isparam and self.get_symbol(name).direction == 'out':
                         exp_addr = self.gen.set_new_reg("M[FP+%s]" % self.get_symbol(name).addr)
@@ -1013,14 +1018,16 @@ class Parser:
         String
         """
         if self.match(Tokens.STRING):
-            symbol = Symbol(self.matched_token.value, self.matched_token.type, len(self.matched_token.value)+1)
+            symbol = Symbol(self.matched_token.value, self.matched_token.type, size=100)
             symbol.isarray = True
             self.add_symbol(symbol)
 
             for i,c in enumerate(self.matched_token.value):
-                self.gen.write("M[FP+%s] = '%s';" % (symbol.addr+i,c))
+                self.gen.write("tmp_string[%s] = '%s';" % (i,c))
 
-            self.gen.write("M[FP+%s] = '\\0';" % (symbol.addr+i+1))
+            self.gen.write("tmp_string[%s] = '\\0';" % (i+1))
+
+            self.gen.write("memcpy(&M[FP+%s], tmp_string, MAX_STR_LEN);" % symbol.addr)
 
             self.gen.write("SP = SP + %d;" % symbol.size)
 

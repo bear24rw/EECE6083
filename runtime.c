@@ -6,6 +6,7 @@ int M[MEM_SIZE];
 int SP = 0;
 int FP = 0;
 float tmp_float;
+char tmp_string[MAX_STR_LEN];
 
 void putInteger(int x)
 {
@@ -19,7 +20,7 @@ void putBool(int x)
 
 void putString(int x)
 {
-    while (M[x]) printf("%c", M[x++]);
+    printf("%s", (char*)&M[x]);
 }
 
 void putFloat(float x)
@@ -41,8 +42,7 @@ float getFloat()
     return x;
 }
 
-int getString(char *x)
+void getString()
 {
-    scanf("%s", x);
-    return strlen(x) + 1;
+    fgets(tmp_string, MAX_STR_LEN, stdin);
 }

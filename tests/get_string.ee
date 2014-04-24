@@ -1,0 +1,8 @@
+program get_string is
+    string a;
+begin
+    putString("Enter string: ");
+    getString(a);
+    putString(" You entered ");
+    putString(a);
+end program;

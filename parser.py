@@ -70,6 +70,10 @@ class Parser:
         self.global_symbols['putstring'].type = 'procedure'
         self.global_symbols['putstring'].params.append(Symbol(type="STRING", direction="in"))
 
+        self.global_symbols['putfloat'] = Symbol('putfloat')
+        self.global_symbols['putfloat'].type = 'procedure'
+        self.global_symbols['putfloat'].params.append(Symbol(type="FLOAT", direction="in"))
+
     def warning(self, message, token=None):
 
         self.print_message(message, label="warning", token=token, color=Color.YELLOW)
@@ -977,11 +981,21 @@ class Parser:
         """
         Numbers
         """
-        if self.match(Tokens.INTEGER) or self.match(Tokens.FLOAT):
+        if self.match(Tokens.INTEGER):
             addr = self.gen.set_new_reg(self.matched_token.value)
             if negate:
                 addr = self.gen.set_new_reg("-1 * R[%d]" % addr)
             return (addr, self.matched_token.type)
+
+        if self.match(Tokens.FLOAT):
+            if negate:
+                self.gen.write("tmp_float = -1 * %s;" % self.matched_token.value)
+            else:
+                self.gen.write("tmp_float = %s;" % self.matched_token.value)
+            r = self.gen.new_reg()
+            self.gen.write("memcpy(&R[%s], &tmp_float, sizeof(float));" % r)
+            return (r, self.matched_token.type)
+
 
         """
         String

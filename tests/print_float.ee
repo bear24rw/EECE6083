@@ -1,0 +1,6 @@
+program print_float is
+    float a;
+begin
+    a := 5.845;
+    putFloat(a);
+end program;

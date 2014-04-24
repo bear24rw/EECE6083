@@ -21,3 +21,12 @@ putstring:
     FP = M[FP-1];
     SP = SP - 3;
     goto *(void *)R[0];
+
+putfloat:
+    memcpy(&tmp_float, &M[FP], sizeof(float));
+    putFloat(tmp_float);
+    R[0] = M[FP-2];
+    FP = M[FP-1];
+    SP = SP - 3;
+    goto *(void *)R[0];
+

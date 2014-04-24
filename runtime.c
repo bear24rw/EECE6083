@@ -5,6 +5,7 @@ int R[NUM_REGS];
 int M[MEM_SIZE];
 int SP = 0;
 int FP = 0;
+float tmp_float;
 
 void putInteger(int x)
 {
@@ -19,4 +20,9 @@ void putBool(int x)
 void putString(int x)
 {
     while (M[x]) printf("%c", M[x++]);
+}
+
+void putFloat(float x)
+{
+    printf("%f", x);
 }

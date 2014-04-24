@@ -1,0 +1,8 @@
+program get_integer is
+    integer a;
+begin
+    putString("Enter integer: ");
+    getInteger(a);
+    putString(" You entered ");
+    putInteger(a);
+end program;

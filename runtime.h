@@ -18,4 +18,9 @@ void putBool(int);
 void putString(int x);
 void putFloat(float x);
 
+int getInteger();
+int getBool();
+float getFloat();
+int getString(char *x);
+
 #endif

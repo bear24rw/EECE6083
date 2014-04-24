@@ -74,6 +74,18 @@ class Parser:
         self.global_symbols['putfloat'].type = 'procedure'
         self.global_symbols['putfloat'].params.append(Symbol(type="FLOAT", direction="in"))
 
+        self.global_symbols['getinteger'] = Symbol('getinteger')
+        self.global_symbols['getinteger'].type = 'procedure'
+        self.global_symbols['getinteger'].params.append(Symbol(type="INTEGER", direction="out"))
+
+        self.global_symbols['getbool'] = Symbol('getbool')
+        self.global_symbols['getbool'].type = 'procedure'
+        self.global_symbols['getbool'].params.append(Symbol(type="BOOL", direction="out"))
+
+        self.global_symbols['getfloat'] = Symbol('getfloat')
+        self.global_symbols['getfloat'].type = 'procedure'
+        self.global_symbols['getfloat'].params.append(Symbol(type="FLOAT", direction="out"))
+
     def warning(self, message, token=None):
 
         self.print_message(message, label="warning", token=token, color=Color.YELLOW)

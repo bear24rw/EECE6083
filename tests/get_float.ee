@@ -1,0 +1,8 @@
+program get_float is
+    float a;
+begin
+    putString("Enter float: ");
+    getFloat(a);
+    putString(" You entered ");
+    putFloat(a);
+end program;

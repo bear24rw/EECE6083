@@ -26,3 +26,23 @@ void putFloat(float x)
 {
     printf("%f", x);
 }
+
+int getInteger()
+{
+    int x;
+    scanf("%d", &x);
+    return x;
+}
+
+float getFloat()
+{
+    float x;
+    scanf("%f", &x);
+    return x;
+}
+
+int getString(char *x)
+{
+    scanf("%s", x);
+    return strlen(x) + 1;
+}

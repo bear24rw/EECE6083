@@ -1,0 +1,8 @@
+program print_bool is
+    bool a;
+begin
+    a := true;
+    putBool(a);
+    a := false;
+    putBool(a);
+end program;

@@ -1,0 +1,9 @@
+program get_bool is
+    bool a;
+begin
+    putString("Input bool: ");
+    getBool(a);
+    putString("Got bool: ");
+    putBool(a);
+end program;
+

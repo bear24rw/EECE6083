@@ -33,7 +33,7 @@ gen.write_file(c_filename)
 if args.c_only:
     sys.exit(0)
 
-return_code = subprocess.call(['gcc', '-Wno-int-to-pointer-cast', '-Wno-pointer-to-int-cast', '-o', o_filename, '-I', 'runtime', 'runtime/runtime.c', c_filename])
+return_code = subprocess.call(['gcc', '-m32', '-Wno-int-to-pointer-cast', '-Wno-pointer-to-int-cast', '-o', o_filename, '-I', 'runtime', 'runtime/runtime.c', c_filename])
 
 if args.run:
     subprocess.call([o_filename])

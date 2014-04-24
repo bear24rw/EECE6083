@@ -4,9 +4,9 @@ import sys
 import argparse
 import subprocess
 
-from scanner import Scanner
-from parser import Parser
-from gen import Gen
+from src.scanner import Scanner
+from src.parser import Parser
+from src.gen import Gen
 
 argparser = argparse.ArgumentParser(description='EECS 6083 Compiler')
 
@@ -33,7 +33,7 @@ gen.write_file(c_filename)
 if args.c_only:
     sys.exit(0)
 
-subprocess.call(['gcc', '-Wno-int-to-pointer-cast', '-Wno-pointer-to-int-cast', '-o', o_filename, '-I', '.', 'runtime.c', c_filename])
+return_code = subprocess.call(['gcc', '-Wno-int-to-pointer-cast', '-Wno-pointer-to-int-cast', '-o', o_filename, '-I', 'runtime', 'runtime/runtime.c', c_filename])
 
 if args.run:
     subprocess.call([o_filename])

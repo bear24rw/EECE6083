@@ -14,10 +14,10 @@ class Gen:
 
     def write_file(self, filename):
         with open(filename, 'w') as f:
-            f.write('#include "runtime.h"\n')
+            f.write('#include <runtime.h>\n')
             f.write('int main(void) {\n')
             f.write('    goto main;\n\n')
-            f.write(open("runtime_inline.c").read())
+            f.write(open("runtime/runtime_inline.c").read())
             f.write('\n')
             f.writelines('\n'.join(self.lines))
             f.write('\n\n')

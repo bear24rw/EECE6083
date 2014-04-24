@@ -274,7 +274,6 @@ class Parser:
         """
         self.program_header()
         self.program_body()
-        print "Finished Parsing"
 
     def program_header(self):
         """
@@ -683,6 +682,7 @@ class Parser:
                                 r = self.gen.set_new_reg("FP + %s" % self.get_symbol(name).addr)
                             arguments.append((r, self.token.type))
                             exp_type = self.get_symbol(name).type
+                            self.get_symbol(name).used = True
                         else:
                             raise ParseError("expected array indentifier or expression")
                     else:
@@ -1066,11 +1066,13 @@ class Parser:
             return (self.get_symbol(name).current_reg, self.get_symbol(name).type)
         """
 
-        if not self.get_symbol(name).used:
+        """
+        if not self.get_symbol(name).used and not self.get_symbol(name).isparam:
             # TODO: if it is a global variable and we are currently
             # processing a procedure than this false triggers. Maybe
             # only check for non-global variables?
             self.warning("variable '%s' is uninitialized when used here" % name, token=self.prev_token)
+        """
 
         offset_reg = None
 

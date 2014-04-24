@@ -1,8 +1,7 @@
 class Gen:
 
-    def __init__(self, filename):
+    def __init__(self):
 
-        self.filename = filename
         self.lines = []
         self.registers = []
         self.memory = []

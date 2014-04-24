@@ -90,6 +90,8 @@ class Parser:
         self.global_symbols['getfloat'].type = 'procedure'
         self.global_symbols['getfloat'].params.append(Symbol(type="FLOAT", direction="out"))
 
+        self.program()
+
     def warning(self, message, token=None):
 
         self.print_message(message, label="warning", token=token, color=Color.YELLOW)
@@ -1112,10 +1114,9 @@ if __name__ == "__main__":
     import sys
     from scanner import Scanner
     from gen import Gen
-    gen = Gen("/tmp/out.txt")
+    gen = Gen()
     scanner = Scanner(sys.argv[1])
     parser = Parser(scanner, gen)
-    parser.program()
 
     if scanner.has_errors or parser.has_errors:
         print "-"*50

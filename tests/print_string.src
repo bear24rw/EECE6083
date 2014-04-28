@@ -1,4 +1,7 @@
 program print_string is
+    string a;
 begin
-    putString("hello world");
+    putString("hello");
+    a := " world";
+    putString(a);
 end program;

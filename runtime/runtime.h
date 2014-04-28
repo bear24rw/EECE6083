@@ -13,6 +13,7 @@ extern int R[NUM_REGS];
 extern int M[MEM_SIZE];
 extern int SP;
 extern int FP;
+extern int HP;
 extern float tmp_float;
 extern char tmp_string[MAX_STR_LEN];
 

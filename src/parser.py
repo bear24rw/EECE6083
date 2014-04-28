@@ -20,6 +20,7 @@ class Symbol:
         self.isglobal = False
         self.isparam = False
         self.isarray = False
+        self.isstring = False
 
     def __repr__(self):
         if self.type == 'procedure':
@@ -521,11 +522,13 @@ class Parser:
             size = int(size)
 
         if typemark == "STRING":
-            size = 100
-            isarray = True
+            isstring = True
+        else:
+            isstring = False
 
         symbol = Symbol(name, typemark, size=size)
         symbol.isarray = isarray
+        symbol.isstring = isstring
         self.add_symbol(symbol, is_global)
 
         return symbol
@@ -1021,7 +1024,7 @@ class Parser:
         """
         if self.match(Tokens.STRING):
             symbol = Symbol(self.matched_token.value, self.matched_token.type, size=100)
-            symbol.isarray = True
+            symbol.isstring = True
             self.add_symbol(symbol)
 
             for i,c in enumerate(self.matched_token.value):

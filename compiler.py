@@ -35,5 +35,9 @@ if args.c_only:
 
 return_code = subprocess.call(['gcc', '-m32', '-Wno-int-to-pointer-cast', '-Wno-pointer-to-int-cast', '-o', o_filename, '-I', 'runtime', 'runtime/runtime.c', c_filename])
 
+if return_code == 1:
+    print "GCC ERROR"
+    sys.exit(return_code)
+
 if args.run:
     subprocess.call([o_filename])
